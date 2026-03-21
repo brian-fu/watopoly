@@ -1,0 +1,329 @@
+@startuml
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "Core Engine" {
+  class WatopolyGame {
+    +int run(int argc, char **argv)
+    +void start()
+    +void setupNewGame()
+    +void setupLoadedGame(std::string const &file)
+    +void nextPlayer()
+    +Player &currentPlayer()
+    +void processTurn()
+    +void resolveLanding(Player &player, int boardPos)
+    +void handleDebt(Player &debtor, int amount, Player *creditor)
+    +bool isGameOver() const
+    +void announceWinner() const
+    +void redrawBoard() const
+  }
+
+  class Board {
+    +Square &getSquare(int position)
+    +Square const &getSquare(int position) const
+    +int positionOf(std::string const &squareName) const
+    +void initializeDefaultLayout()
+    +void attach(DisplayObserver *obs)
+    +void detach(DisplayObserver *obs)
+    +void notify()
+  }
+
+  class Player {
+    +std::string getName() const
+    +char getToken() const
+    +int getCash() const
+    +int getPosition() const
+    +void addCash(int amount)
+    +bool deductCash(int amount)
+    +void moveBy(int steps)
+    +void moveTo(int position)
+    +void addProperty(Property *prop)
+    +void removeProperty(Property *prop)
+    +std::vector<Property *> const &properties() const
+    +int getTotalWorth() const
+    +bool isInTimsLine() const
+    +void enterTimsLine()
+    +void leaveTimsLine()
+    +int timsTurns() const
+    +void incrementTimsTurns()
+    +int timsCups() const
+    +void addTimsCup()
+    +bool useTimsCup()
+    +void declareBankruptcy()
+    +bool isBankrupt() const
+  }
+
+  class Dice {
+    +DiceResult roll()
+    +DiceResult roll(int die1, int die2)
+    +void resetConsecutiveDoubles()
+    +int consecutiveDoubles() const
+  }
+
+  struct DiceResult {
+    +int die1
+    +int die2
+    +int sum
+    +bool isDoubles
+  }
+}
+
+package "Squares" {
+  abstract class Square {
+    +std::string name() const
+    +int index() const
+    +void landOn(Player &player, WatopolyGame &game)
+  }
+
+  abstract class Property {
+    +int purchaseCost() const
+    +Player *owner() const
+    +void setOwner(Player *player)
+    +bool isMortgaged() const
+    +void mortgage()
+    +void unmortgage()
+    +int calculateFee(Player &visitor, WatopolyGame &game)
+    +void landOn(Player &player, WatopolyGame &game)
+  }
+
+  class AcademicBuilding {
+    +std::string monopolyName() const
+    +int improvementCost() const
+    +int improvements() const
+    +bool canBuyImprovement(Player const &owner) const
+    +bool buyImprovement()
+    +bool sellImprovement()
+    +int calculateFee(Player &visitor, WatopolyGame &game)
+  }
+
+  class Residence {
+    +int calculateFee(Player &visitor, WatopolyGame &game)
+  }
+
+  class Gym {
+    +int calculateFee(Player &visitor, WatopolyGame &game)
+  }
+
+  class CollectOSAP {
+    +void landOn(Player &player, WatopolyGame &game)
+  }
+
+  class DCTimsLine {
+    +void landOn(Player &player, WatopolyGame &game)
+  }
+
+  class GoToTims {
+    +void landOn(Player &player, WatopolyGame &game)
+  }
+
+  class GooseNesting {
+    +void landOn(Player &player, WatopolyGame &game)
+  }
+
+  class TuitionSquare {
+    +void landOn(Player &player, WatopolyGame &game)
+    +int tenPercentOfWorth(Player const &player) const
+  }
+
+  class CoopFee {
+    +void landOn(Player &player, WatopolyGame &game)
+  }
+
+  class SLCSquare {
+    +void landOn(Player &player, WatopolyGame &game)
+  }
+
+  class NeedlesHallSquare {
+    +void landOn(Player &player, WatopolyGame &game)
+  }
+
+  Square <|-- Property
+  Property <|-- AcademicBuilding
+  Property <|-- Residence
+  Property <|-- Gym
+
+  Square <|-- CollectOSAP
+  Square <|-- DCTimsLine
+  Square <|-- GoToTims
+  Square <|-- GooseNesting
+  Square <|-- TuitionSquare
+  Square <|-- CoopFee
+  Square <|-- SLCSquare
+  Square <|-- NeedlesHallSquare
+}
+
+package "Ownership & Economy" {
+  class MonopolyBlock {
+    +std::string name() const
+    +bool isOwnedBy(Player const &player) const
+    +bool hasAnyImprovements() const
+    +std::vector<AcademicBuilding *> buildings() const
+  }
+
+  class Auction {
+    +void run(Property &property, std::vector<Player *> bidders)
+    +int currentBid() const
+    +Player *leadingBidder() const
+  }
+
+  class Trade {
+    +bool validate(Player const &from, Player const &to) const
+    +void presentTo(Player &target) const
+    +bool execute(Player &from, Player &to)
+  }
+}
+
+package "Command Layer" {
+  class CommandInterpreter {
+    +void registerDefaultCommands()
+    +bool executeLine(std::string const &line, WatopolyGame &game)
+    +void printInvalidCommand(std::string const &line) const
+  }
+
+  abstract class Command {
+    +std::string name() const
+    +bool execute(WatopolyGame &game, std::vector<std::string> const &args)
+  }
+
+  class RollCommand
+  class NextCommand
+  class TradeCommand
+  class ImproveCommand
+  class MortgageCommand
+  class UnmortgageCommand
+  class BankruptCommand
+  class AssetsCommand
+  class AllCommand
+  class SaveCommand
+
+  Command <|-- RollCommand
+  Command <|-- NextCommand
+  Command <|-- TradeCommand
+  Command <|-- ImproveCommand
+  Command <|-- MortgageCommand
+  Command <|-- UnmortgageCommand
+  Command <|-- BankruptCommand
+  Command <|-- AssetsCommand
+  Command <|-- AllCommand
+  Command <|-- SaveCommand
+}
+
+package "Persistence" {
+  class SaveManager {
+    +void save(WatopolyGame const &game, std::string const &filename)
+    +void load(WatopolyGame &game, std::string const &filename)
+    +bool validateLoadedState(WatopolyGame const &game) const
+  }
+}
+
+package "Presentation" {
+  class DisplayObserver {
+    +void update(Board const &board, std::vector<Player> const &players)
+  }
+
+  class BoardDisplay {
+    +void update(Board const &board, std::vector<Player> const &players)
+    +std::string renderSquare(Square const &sq) const
+    +void printAssets(Player const &player) const
+  }
+
+  DisplayObserver <|-- BoardDisplay
+}
+
+package "Randomness" {
+  class RandomEventGenerator {
+    +void seed(unsigned value)
+    +int rollDie()
+    +SLCEvent generateSLCEvent()
+    +int generateNeedlesHallDelta()
+    +bool rollUpTheRimCheck(int activeCupCount)
+  }
+
+  enum SLCEvent {
+    Back3
+    Back2
+    Back1
+    Forward1
+    Forward2
+    Forward3
+    GoToTims
+    AdvanceToOSAP
+  }
+}
+
+enum TurnPhase {
+  PreRoll
+  Rolling
+  PostRoll
+  DebtResolution
+  TuitionDecision
+}
+
+enum PieceType {
+  G
+  B
+  D
+  P
+  S
+  Dollar
+  L
+  T
+}
+
+WatopolyGame "1" o-- "1" Board
+WatopolyGame "1" o-- "2..6" Player
+WatopolyGame "1" o-- "1" Dice
+WatopolyGame "1" o-- "1" CommandInterpreter
+WatopolyGame "1" o-- "1" SaveManager
+WatopolyGame "1" o-- "1" RandomEventGenerator
+WatopolyGame "1" o-- "1" Auction
+WatopolyGame "1" o-- "*" Trade
+WatopolyGame ..> TurnPhase
+
+Board "1" o-- "40" Square
+Board "1" o-- "*" DisplayObserver
+BoardDisplay ..> Board
+
+Player "1" --> "*" Property : owns >
+Property "0..1" --> "1" Player : owner
+Property ..> WatopolyGame
+Gym ..> DiceResult
+
+AcademicBuilding "1" --> "1" MonopolyBlock
+MonopolyBlock "1" o-- "2..3" AcademicBuilding
+
+CommandInterpreter "1" o-- "*" Command
+Command ..> WatopolyGame
+
+SaveManager ..> Board
+SaveManager ..> Player
+SaveManager ..> Property
+
+SLCSquare ..> RandomEventGenerator
+NeedlesHallSquare ..> RandomEventGenerator
+Dice ..> RandomEventGenerator
+RandomEventGenerator ..> SLCEvent
+
+Player ..> PieceType
+
+note right of Board
+  Board square order follows the
+  Watopoly specification exactly
+  (positions 0..39).
+end note
+
+note bottom of Property
+  Mortgage state:
+  - Mortgaged properties charge no fee
+  - Unmortgage cost = 60% of purchase cost
+end note
+
+note bottom of SaveManager
+  Save/load validates:
+  - player count (2..6)
+  - Tims-line encoding
+  - owner names / BANK
+  - improvement bounds / mortgage marker
+end note
+
+@enduml
