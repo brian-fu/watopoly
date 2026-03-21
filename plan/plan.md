@@ -22,15 +22,27 @@ This document pairs with `uml.pdf` and explains the classes, their responsibilit
 
 See `uml.pdf` for the full class diagram.
 
-| Subsystem | Key Classes | Purpose |
-|-----------|-------------|---------|
-| Core Engine | `WatopolyGame`, `Board`, `Player`, `Dice` | Central game loop, board state, player state, dice rolling and doubles tracking. |
-| Squares | `Square` hierarchy (`AcademicBuilding`, `Residence`, `Gym`, `CollectOSAP`, `DCTimsLine`, `GoToTims`, `GooseNesting`, `TuitionSquare`, `CoopFee`, `SLCSquare`, `NeedlesHallSquare`) | Landing logic for each of the 40 board squares. |
-| Ownership & Economy | `Property` (abstract), `MonopolyBlock`, `Auction`, `Trade` | Property ownership, monopoly grouping, improvement management, auction bidding, and trade negotiation. |
-| Command Layer | `CommandInterpreter`, `Command` hierarchy | Parsing user input, dispatching to the appropriate game action, and handling invalid input gracefully. |
-| Persistence | `SaveManager` | Serialization and deserialization of the full game state to/from the specified file format. |
-| Presentation | `BoardDisplay`, `DisplayObserver` | Text rendering of the board, with an Observer interface so additional display modes can be added without modifying game logic. |
-| Randomness | `RandomEventGenerator` | Centralized RNG for dice, SLC, Needles Hall, and Roll Up the Rim cups. Supports seeding for reproducibility. |
+- **Core Engine**
+  - **Key classes:** `WatopolyGame`, `Board`, `Player`, `Dice`
+  - **Purpose:** Central game loop, board state, player state, dice rolling, and doubles tracking.
+- **Squares**
+  - **Key classes:** `Square` hierarchy (`AcademicBuilding`, `Residence`, `Gym`, `CollectOSAP`, `DCTimsLine`, `GoToTims`, `GooseNesting`, `TuitionSquare`, `CoopFee`, `SLCSquare`, `NeedlesHallSquare`)
+  - **Purpose:** Landing logic for each of the 40 board squares.
+- **Ownership & Economy**
+  - **Key classes:** `Property` (abstract), `MonopolyBlock`, `Auction`, `Trade`
+  - **Purpose:** Property ownership, monopoly grouping, improvement management, auction bidding, and trade negotiation.
+- **Command Layer**
+  - **Key classes:** `CommandInterpreter`, `Command` hierarchy
+  - **Purpose:** Parsing user input, dispatching game actions, and handling invalid input gracefully.
+- **Persistence**
+  - **Key classes:** `SaveManager`
+  - **Purpose:** Serialization and deserialization of full game state to/from the required save-file format.
+- **Presentation**
+  - **Key classes:** `BoardDisplay`, `DisplayObserver`
+  - **Purpose:** Text rendering plus an observer abstraction to support future displays without changing game logic.
+- **Randomness**
+  - **Key classes:** `RandomEventGenerator`
+  - **Purpose:** Centralized RNG for dice, SLC, Needles Hall, and Roll Up the Rim cups, with seed support for reproducibility.
 
 `WatopolyGame` is the central controller. It owns the `Board`, the list of `Player`s, the `Dice`, the `CommandInterpreter`, the `RandomEventGenerator`, and the `BoardDisplay`. After each command, the display is redrawn.
 
@@ -90,18 +102,16 @@ See `uml.pdf` for the full class diagram.
 
 - **`Command`** (abstract) — Base class with `execute(WatopolyGame&, std::vector<std::string> args)`. Concrete subclasses:
 
-  | Command Class | Trigger | Action |
-  |---------------|---------|--------|
-  | `RollCommand` | `roll` / `roll d1 d2` | Rolls dice, moves player, triggers square's `landOn`. Handles doubles (roll again) and triple doubles (go to Tims). |
-  | `NextCommand` | `next` | Ends the current player's turn, advances to the next player. Only valid when the player cannot roll. |
-  | `TradeCommand` | `trade <name> <give> <receive>` | Creates and processes a `Trade` between the current player and the named player. |
-  | `ImproveCommand` | `improve <property> buy/sell` | Buys or sells an improvement on the specified academic building. Validates monopoly ownership and improvement limits. |
-  | `MortgageCommand` | `mortgage <property>` | Mortgages the specified property. Validates ownership and that no improvements exist on the property (or its monopoly block). |
-  | `UnmortgageCommand` | `unmortgage <property>` | Unmortgages the specified property. Charges 60% of purchase cost. |
-  | `BankruptCommand` | `bankrupt` | Declares bankruptcy. Only available when the player owes more than they have. Transfers assets to creditor or auctions them if owed to the Bank. |
-  | `AssetsCommand` | `assets` | Displays the current player's assets (properties, cash, improvements). Disabled during Tuition decision. |
-  | `AllCommand` | `all` | Displays all players' assets. Disabled during Tuition decision. |
-  | `SaveCommand` | `save <filename>` | Writes the full game state to the specified file in the required format. |
+  - **`RollCommand`** (`roll` / `roll d1 d2`) — Rolls dice, moves player, triggers square `landOn`, handles doubles (roll again) and triple doubles (send to Tims).
+  - **`NextCommand`** (`next`) — Ends the current player's turn and advances to the next player. Only valid when the player cannot roll.
+  - **`TradeCommand`** (`trade <name> <give> <receive>`) — Creates and processes a `Trade` between the current player and the named player.
+  - **`ImproveCommand`** (`improve <property> buy/sell`) — Buys or sells an improvement on the specified academic building, with monopoly and improvement-limit validation.
+  - **`MortgageCommand`** (`mortgage <property>`) — Mortgages the specified property, validating ownership and no-improvement constraints.
+  - **`UnmortgageCommand`** (`unmortgage <property>`) — Unmortgages the specified property and charges 60% of purchase cost.
+  - **`BankruptCommand`** (`bankrupt`) — Declares bankruptcy when the player owes more than available cash; transfers/auctions assets based on creditor.
+  - **`AssetsCommand`** (`assets`) — Displays the current player's assets (properties, cash, improvements). Disabled during Tuition decision.
+  - **`AllCommand`** (`all`) — Displays every player's assets. Disabled during Tuition decision.
+  - **`SaveCommand`** (`save <filename>`) — Writes the full game state to file in the required save format.
 
 ### 3.5 Persistence
 
@@ -123,48 +133,46 @@ See `uml.pdf` for the full class diagram.
 
 The 40 squares are arranged clockwise starting from Collect OSAP:
 
-| Position | Square Name | Type |
-|----------|-------------|------|
-| 0 | Collect OSAP | Non-property |
-| 1 | AL | Academic Building (Arts1) |
-| 2 | SLC | Non-property |
-| 3 | ML | Academic Building (Arts1) |
-| 4 | Tuition | Non-property |
-| 5 | MKV | Residence |
-| 6 | ECH | Academic Building (Arts2) |
-| 7 | Needles Hall | Non-property |
-| 8 | PAS | Academic Building (Arts2) |
-| 9 | HH | Academic Building (Arts2) |
-| 10 | DC Tims Line | Non-property |
-| 11 | RCH | Academic Building (Eng) |
-| 12 | PAC | Gym |
-| 13 | DWE | Academic Building (Eng) |
-| 14 | CPH | Academic Building (Eng) |
-| 15 | UWP | Residence |
-| 16 | LHI | Academic Building (Health) |
-| 17 | SLC | Non-property |
-| 18 | BMH | Academic Building (Health) |
-| 19 | OPT | Academic Building (Health) |
-| 20 | Goose Nesting | Non-property |
-| 21 | EV1 | Academic Building (Env) |
-| 22 | Needles Hall | Non-property |
-| 23 | EV2 | Academic Building (Env) |
-| 24 | EV3 | Academic Building (Env) |
-| 25 | V1 | Residence |
-| 26 | PHYS | Academic Building (Sci1) |
-| 27 | B1 | Academic Building (Sci1) |
-| 28 | CIF | Gym |
-| 29 | B2 | Academic Building (Sci1) |
-| 30 | Go to Tims | Non-property |
-| 31 | EIT | Academic Building (Sci2) |
-| 32 | ESC | Academic Building (Sci2) |
-| 33 | Needles Hall | Non-property |
-| 34 | C2 | Academic Building (Sci2) |
-| 35 | REV | Residence |
-| 36 | Needles Hall | Non-property |
-| 37 | MC | Academic Building (Math) |
-| 38 | Coop Fee | Non-property |
-| 39 | DC | Academic Building (Math) |
+- `0`: Collect OSAP (Non-property)
+- `1`: AL (Academic Building - Arts1)
+- `2`: SLC (Non-property)
+- `3`: ML (Academic Building - Arts1)
+- `4`: Tuition (Non-property)
+- `5`: MKV (Residence)
+- `6`: ECH (Academic Building - Arts2)
+- `7`: Needles Hall (Non-property)
+- `8`: PAS (Academic Building - Arts2)
+- `9`: HH (Academic Building - Arts2)
+- `10`: DC Tims Line (Non-property)
+- `11`: RCH (Academic Building - Eng)
+- `12`: PAC (Gym)
+- `13`: DWE (Academic Building - Eng)
+- `14`: CPH (Academic Building - Eng)
+- `15`: UWP (Residence)
+- `16`: LHI (Academic Building - Health)
+- `17`: SLC (Non-property)
+- `18`: BMH (Academic Building - Health)
+- `19`: OPT (Academic Building - Health)
+- `20`: Goose Nesting (Non-property)
+- `21`: EV1 (Academic Building - Env)
+- `22`: Needles Hall (Non-property)
+- `23`: EV2 (Academic Building - Env)
+- `24`: EV3 (Academic Building - Env)
+- `25`: V1 (Residence)
+- `26`: PHYS (Academic Building - Sci1)
+- `27`: B1 (Academic Building - Sci1)
+- `28`: CIF (Gym)
+- `29`: B2 (Academic Building - Sci1)
+- `30`: Go to Tims (Non-property)
+- `31`: EIT (Academic Building - Sci2)
+- `32`: ESC (Academic Building - Sci2)
+- `33`: Needles Hall (Non-property)
+- `34`: C2 (Academic Building - Sci2)
+- `35`: REV (Residence)
+- `36`: Needles Hall (Non-property)
+- `37`: MC (Academic Building - Math)
+- `38`: Coop Fee (Non-property)
+- `39`: DC (Academic Building - Math)
 
 ---
 
@@ -321,19 +329,52 @@ All serialization logic is contained within `SaveManager`. If the file format ch
 
 ## 9. Implementation Roadmap
 
-| Part | Dates | Cristophe Chen | Brian Fu | Kevin Wang |
-|------|-------|----------------|----------|------------|
-| 1 | Day 1 | Finalize UML draft + class relationships for `WatopolyGame`, `Board`, and `Player`. | Finalize UML draft + command layer classes (`CommandInterpreter`, `Command` hierarchy). | Finalize UML draft + square/property hierarchy (`Square`, `Property`, specialized squares). |
-| 2 | Day 2 | Implement project skeleton (`order.txt`, module files, shared enums/structs including `DiceResult`). | Implement `Square` base + non-property squares (`CollectOSAP`, `GooseNesting`, `CoopFee`). | Implement remaining non-property squares (`DCTimsLine`, `GoToTims`, `SLC`, `NeedlesHall`, `Tuition`). |
-| 3 | Day 3 | Implement `Property` base class + `MonopolyBlock`. | Implement `AcademicBuilding` (tuition table, improvement buy/sell rules). | Implement `Residence` + `Gym` fee logic and ownership hooks. |
-| 4 | Day 4 | Implement `WatopolyGame` core turn state + doubles/triple-doubles logic. | Implement `CommandInterpreter` skeleton (`roll`, `next`, parser validation). | Implement `Board` initialization (40-square order) + `BoardDisplay` text rendering hookup. |
-| 5 | Day 5 | Implement purchase flow + `Auction` bidding loop. | Implement economy commands (`improve`, `mortgage`, `unmortgage`) with rule checks. | Integrate movement + landing effects + OSAP pass/land handling. |
-| 6 | Day 6 | Implement trading system (`trade`, offer validation, accept/reject flow). | Implement bankruptcy flow to player/Bank, including mortgaged transfer rules and auctions. | Implement DC Tims Line complete flow (roll/pay/cup/third-turn forced exit). |
-| 7 | Day 7 | Implement `SaveManager::save` and serialization format validation. | Implement `SaveManager::load` and full state reconstruction (`-load` startup path). | Implement testing mode (`-testing`, `roll <die1> <die2>`) and RNG seed option. |
-| 8 | Day 8 | Write integration tests for core game loop (movement, doubles, turns, win condition). | Write integration tests for economy (purchase, rent, improve, mortgage, bankruptcy). | Write integration tests for special squares (SLC, Needles Hall, Tims Line, Tuition, cups). |
-| 9 | Day 9 | Final integration pass + edge-case fixes. | Final integration pass + command robustness (invalid input and recovery). | Final integration pass + display/save-load consistency checks. |
-| 10 | Day 10 | Final checks + Marmoset dry run and submission prep. | Final checks + Marmoset dry run and submission prep. | Final checks + Marmoset dry run and submission prep. |
+1. **Day 1**
+   - **Cristophe Chen:** Finalize UML draft + class relationships for `WatopolyGame`, `Board`, and `Player`.
+   - **Brian Fu:** Finalize UML draft + command layer classes (`CommandInterpreter`, `Command` hierarchy).
+   - **Kevin Wang:** Finalize UML draft + square/property hierarchy (`Square`, `Property`, specialized squares).
 
-Each day ends with a compiling build on `main` so progress remains demo-ready. Task ownership is balanced across all days, and all three members contribute to design, core implementation, testing, and final validation.
+2. **Day 2**
+   - **Cristophe Chen:** Implement project skeleton (`order.txt`, module files, shared enums/structs including `DiceResult`).
+   - **Brian Fu:** Implement `Square` base + non-property squares (`CollectOSAP`, `GooseNesting`, `CoopFee`).
+   - **Kevin Wang:** Implement remaining non-property squares (`DCTimsLine`, `GoToTims`, `SLC`, `NeedlesHall`, `Tuition`).
 
-This design prioritizes simplicity, extensibility, and robustness. Each class has a single, well-defined responsibility, and the use of polymorphism and the Observer Pattern ensures that new features can be added with minimal modification to existing code.
+3. **Day 3**
+   - **Cristophe Chen:** Implement `Property` base class + `MonopolyBlock`.
+   - **Brian Fu:** Implement `AcademicBuilding` (tuition table, improvement buy/sell rules).
+   - **Kevin Wang:** Implement `Residence` + `Gym` fee logic and ownership hooks.
+
+4. **Day 4**
+   - **Cristophe Chen:** Implement `WatopolyGame` core turn state + doubles/triple-doubles logic.
+   - **Brian Fu:** Implement `CommandInterpreter` skeleton (`roll`, `next`, parser validation).
+   - **Kevin Wang:** Implement `Board` initialization (40-square order) + `BoardDisplay` text rendering hookup.
+
+5. **Day 5**
+   - **Cristophe Chen:** Implement purchase flow + `Auction` bidding loop.
+   - **Brian Fu:** Implement economy commands (`improve`, `mortgage`, `unmortgage`) with rule checks.
+   - **Kevin Wang:** Integrate movement + landing effects + OSAP pass/land handling.
+
+6. **Day 6**
+   - **Cristophe Chen:** Implement trading system (`trade`, offer validation, accept/reject flow).
+   - **Brian Fu:** Implement bankruptcy flow to player/Bank, including mortgaged transfer rules and auctions.
+   - **Kevin Wang:** Implement DC Tims Line complete flow (roll/pay/cup/third-turn forced exit).
+
+7. **Day 7**
+   - **Cristophe Chen:** Implement `SaveManager::save` and serialization format validation.
+   - **Brian Fu:** Implement `SaveManager::load` and full state reconstruction (`-load` startup path).
+   - **Kevin Wang:** Implement testing mode (`-testing`, `roll <die1> <die2>`) and RNG seed option.
+
+8. **Day 8**
+   - **Cristophe Chen:** Write integration tests for core game loop (movement, doubles, turns, win condition).
+   - **Brian Fu:** Write integration tests for economy (purchase, rent, improve, mortgage, bankruptcy).
+   - **Kevin Wang:** Write integration tests for special squares (SLC, Needles Hall, Tims Line, Tuition, cups).
+
+9. **Day 9**
+   - **Cristophe Chen:** Final integration pass + edge-case fixes.
+   - **Brian Fu:** Final integration pass + command robustness (invalid input and recovery).
+   - **Kevin Wang:** Final integration pass + display/save-load consistency checks.
+
+10. **Day 10**
+   - **Cristophe Chen:** Final checks + Marmoset dry run and submission prep.
+   - **Brian Fu:** Final checks + Marmoset dry run and submission prep.
+   - **Kevin Wang:** Final checks + Marmoset dry run and submission prep.
