@@ -3,16 +3,27 @@ skinparam classAttributeIconSize 0
 hide empty members
 
 package "Core Engine" {
+  interface IGameContext {
+    +void sendPlayerToTims(Player &player)
+    +void triggerAuction(Property &property, std::vector<Player *> bidders)
+    +void promptPurchase(Player &player, Property &property)
+    +DiceResult rollForGym()
+    +void handleDebt(Player &debtor, int amount, Player *creditor)
+    +int activeCupCount() const
+    +void awardCup(Player &player)
+    +TurnPhase getCurrentPhase() const
+    +std::vector<Player *> getActivePlayers() const
+    +Player &currentPlayer()
+    +void nextPlayer()
+    +Player *findPlayer(std::string const &name) const
+  }
+
   class WatopolyGame {
     +int run(int argc, char **argv)
     +void start()
     +void setupNewGame()
     +void setupLoadedGame(std::string const &file)
-    +void nextPlayer()
-    +Player &currentPlayer()
     +void processTurn()
-    +void resolveLanding(Player &player, int boardPos)
-    +void handleDebt(Player &debtor, int amount, Player *creditor)
     +bool isGameOver() const
     +void announceWinner() const
     +void redrawBoard() const
@@ -22,10 +33,9 @@ package "Core Engine" {
     +Square &getSquare(int position)
     +Square const &getSquare(int position) const
     +int positionOf(std::string const &squareName) const
-    +void initializeDefaultLayout()
     +void attach(DisplayObserver *obs)
     +void detach(DisplayObserver *obs)
-    +void notify()
+    +void notify(std::vector<Player> const &players)
   }
 
   class Player {
@@ -51,6 +61,7 @@ package "Core Engine" {
     +bool useTimsCup()
     +void declareBankruptcy()
     +bool isBankrupt() const
+    +DiceResult getLastRoll() const
   }
 
   class Dice {
@@ -66,13 +77,21 @@ package "Core Engine" {
     +int sum
     +bool isDoubles
   }
+
+  struct TurnContext {
+    +int currentPlayerIndex
+    +TurnPhase phase
+    +int consecutiveDoubles
+    +DiceResult lastRoll
+    +Player *debtCreditor
+  }
 }
 
 package "Squares" {
   abstract class Square {
     +std::string name() const
     +int index() const
-    +void landOn(Player &player, WatopolyGame &game)
+    +void landOn(Player &player, IGameContext &game)
   }
 
   abstract class Property {
@@ -82,8 +101,8 @@ package "Squares" {
     +bool isMortgaged() const
     +void mortgage()
     +void unmortgage()
-    +int calculateFee(Player &visitor, WatopolyGame &game)
-    +void landOn(Player &player, WatopolyGame &game)
+    +int calculateFee(Player &visitor, IGameContext &game)
+    +void landOn(Player &player, IGameContext &game)
   }
 
   class AcademicBuilding {
@@ -93,48 +112,48 @@ package "Squares" {
     +bool canBuyImprovement(Player const &owner) const
     +bool buyImprovement()
     +bool sellImprovement()
-    +int calculateFee(Player &visitor, WatopolyGame &game)
+    +int calculateFee(Player &visitor, IGameContext &game)
   }
 
   class Residence {
-    +int calculateFee(Player &visitor, WatopolyGame &game)
+    +int calculateFee(Player &visitor, IGameContext &game)
   }
 
   class Gym {
-    +int calculateFee(Player &visitor, WatopolyGame &game)
+    +int calculateFee(Player &visitor, IGameContext &game)
   }
 
   class CollectOSAP {
-    +void landOn(Player &player, WatopolyGame &game)
+    +void landOn(Player &player, IGameContext &game)
   }
 
   class DCTimsLine {
-    +void landOn(Player &player, WatopolyGame &game)
+    +void landOn(Player &player, IGameContext &game)
   }
 
   class GoToTims {
-    +void landOn(Player &player, WatopolyGame &game)
+    +void landOn(Player &player, IGameContext &game)
   }
 
   class GooseNesting {
-    +void landOn(Player &player, WatopolyGame &game)
+    +void landOn(Player &player, IGameContext &game)
   }
 
   class TuitionSquare {
-    +void landOn(Player &player, WatopolyGame &game)
-    +int tenPercentOfWorth(Player const &player) const
+    +void landOn(Player &player, IGameContext &game)
+    -int tenPercentOfWorth(Player const &player) const
   }
 
   class CoopFee {
-    +void landOn(Player &player, WatopolyGame &game)
+    +void landOn(Player &player, IGameContext &game)
   }
 
   class SLCSquare {
-    +void landOn(Player &player, WatopolyGame &game)
+    +void landOn(Player &player, IGameContext &game)
   }
 
   class NeedlesHallSquare {
-    +void landOn(Player &player, WatopolyGame &game)
+    +void landOn(Player &player, IGameContext &game)
   }
 
   Square <|-- Property
@@ -167,22 +186,23 @@ package "Ownership & Economy" {
   }
 
   class Trade {
-    +bool validate(Player const &from, Player const &to) const
+    +bool validate() const
     +void presentTo(Player &target) const
-    +bool execute(Player &from, Player &to)
+    +bool execute()
   }
 }
 
 package "Command Layer" {
   class CommandInterpreter {
     +void registerDefaultCommands()
-    +bool executeLine(std::string const &line, WatopolyGame &game)
+    +bool executeLine(std::string const &line, IGameContext &game)
     +void printInvalidCommand(std::string const &line) const
   }
 
   abstract class Command {
     +std::string name() const
-    +bool execute(WatopolyGame &game, std::vector<std::string> const &args)
+    +bool execute(IGameContext &game, std::vector<std::string> const &args)
+    +bool isValidInPhase(TurnPhase phase) const
   }
 
   class RollCommand
@@ -270,6 +290,7 @@ enum PieceType {
   T
 }
 
+' Core ownership
 WatopolyGame "1" o-- "1" Board
 WatopolyGame "1" o-- "2..6" Player
 WatopolyGame "1" o-- "1" Dice
@@ -277,53 +298,99 @@ WatopolyGame "1" o-- "1" CommandInterpreter
 WatopolyGame "1" o-- "1" SaveManager
 WatopolyGame "1" o-- "1" RandomEventGenerator
 WatopolyGame "1" o-- "1" Auction
-WatopolyGame "1" o-- "*" Trade
+WatopolyGame "1" o-- "1" TurnContext
+WatopolyGame ..|> IGameContext
 WatopolyGame ..> TurnPhase
 
+' Board owns all squares and all monopoly blocks
 Board "1" o-- "40" Square
+Board "1" o-- "10" MonopolyBlock
 Board "1" o-- "*" DisplayObserver
 BoardDisplay ..> Board
 
+' Player-Property links (non-owning back-pointers)
 Player "1" --> "*" Property : owns >
 Property "0..1" --> "1" Player : owner
-Property ..> WatopolyGame
+
+' Squares and Commands depend on the IGameContext abstraction, not on concrete WatopolyGame
+Square ..> IGameContext
+Command ..> IGameContext
 Gym ..> DiceResult
 
+' AcademicBuilding holds a non-owning reference to its MonopolyBlock;
+' MonopolyBlock holds non-owning references back to its buildings (Board is sole owner of both)
 AcademicBuilding "1" --> "1" MonopolyBlock
-MonopolyBlock "1" o-- "2..3" AcademicBuilding
+MonopolyBlock "1" --> "2..3" AcademicBuilding
 
+' Command registry uses unique_ptr internally (no raw owning pointers)
 CommandInterpreter "1" o-- "*" Command
-Command ..> WatopolyGame
 
+' Persistence touches Board, Player, Property read-only
 SaveManager ..> Board
 SaveManager ..> Player
 SaveManager ..> Property
 
+' Randomness
 SLCSquare ..> RandomEventGenerator
 NeedlesHallSquare ..> RandomEventGenerator
 Dice ..> RandomEventGenerator
 RandomEventGenerator ..> SLCEvent
 
+' Enums
 Player ..> PieceType
 
+note right of IGameContext
+  Dependency Inversion: all Squares and Commands
+  depend on this narrow interface, not on the
+  concrete WatopolyGame class.
+  WatopolyGame implements IGameContext.
+end note
+
+note right of TurnContext
+  Centralises all per-turn mutable state:
+  - consecutiveDoubles (for triple-doubles jail)
+  - lastRoll (for forced Tims Line third-turn exit)
+  - debtCreditor (null means owed to Bank)
+  - currentPlayerIndex and TurnPhase
+end note
+
 note right of Board
-  Board square order follows the
-  Watopoly specification exactly
-  (positions 0..39).
+  Board is a pure container + Observer Subject.
+  All 40 squares and 10 MonopolyBlocks are
+  constructed by the free function
+  buildDefaultBoard(Board &) — Board itself
+  has no knowledge of specific square types.
 end note
 
 note bottom of Property
   Mortgage state:
   - Mortgaged properties charge no fee
   - Unmortgage cost = 60% of purchase cost
+  - Properties received via bankruptcy transfer
+    incur an immediate 10% Bank fee; an extra
+    10% applies if the recipient unmortgages later
 end note
 
 note bottom of SaveManager
   Save/load validates:
   - player count (2..6)
   - Tims-line encoding
-  - owner names / BANK
+  - owner names / BANK reserved name
   - improvement bounds / mortgage marker
+  - total cup count <= 4
+end note
+
+note bottom of Trade
+  Trade is transient: created stack-locally in
+  TradeCommand::execute and destroyed after
+  resolution. WatopolyGame does not own or
+  accumulate Trade objects.
+end note
+
+note bottom of PieceType
+  char toChar(PieceType p) maps Dollar -> '$';
+  all others map to their enum name's first char.
+  PieceType fromChar(char c) is the inverse.
 end note
 
 @enduml
