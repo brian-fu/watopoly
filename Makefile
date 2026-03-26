@@ -1,12 +1,27 @@
-CXX=g++-14
-SDKROOT=$(shell xcrun --show-sdk-path)
-CXXFLAGS=-std=c++20 -Wall -Wextra -g -fmodules-ts -I/opt/X11/include -I/usr/X11/include -isysroot $(SDKROOT)
+# --- OS Detection & Flag Assignment ---
+UNAME_S := $(shell uname -s)
 
-OBJ_IFACE=src/types.o src/core.o src/board.o src/dice.o src/display.o src/game.o
-OBJ_IMPL=src/core-impl.o src/board-impl.o src/dice-impl.o src/display-impl.o src/game-impl.o
-OBJ=$(OBJ_IFACE) $(OBJ_IMPL) src/main.o
-HEADER_GCM=.header_units_built
+CXX = g++-14
+BASE_CXXFLAGS = -std=c++20 -Wall -Wextra -g -fmodules-ts
 
+ifeq ($(UNAME_S),Darwin)
+	# macOS specific flags (Your friend's environment)
+	SDKROOT = $(shell xcrun --show-sdk-path)
+	OS_CXXFLAGS = -isysroot $(SDKROOT) -I/opt/X11/include -I/usr/X11/include
+else ifeq ($(UNAME_S),Linux)
+	# WSL2 / Linux specific flags (Your environment)
+	OS_CXXFLAGS = 
+endif
+
+CXXFLAGS = $(BASE_CXXFLAGS) $(OS_CXXFLAGS)
+
+# --- Object Definitions ---
+OBJ_IFACE = src/types.o src/core.o src/board.o src/dice.o src/display.o src/game.o
+OBJ_IMPL = src/core-impl.o src/board-impl.o src/dice-impl.o src/display-impl.o src/game-impl.o
+OBJ = $(OBJ_IFACE) $(OBJ_IMPL) src/main.o
+HEADER_GCM = .header_units_built
+
+# --- Build Targets ---
 all: watopoly
 
 watopoly: $(HEADER_GCM) $(OBJ)

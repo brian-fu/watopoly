@@ -1,0 +1,34 @@
+# OS files
+.DS_Store
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# C++ build artifacts
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+biquadris
+
+# GCM (C++ modules/header units) cache
+gcm.cache/
+.header_units_built
+
+# Build directories
+build/
+bin/
+obj/
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+watopoly
