@@ -140,13 +140,15 @@ void BoardDisplay::update(const GameSnapshot &snap) {
     int midWidth = (COLS - 2) * (W + 1) - 1;
 
     // simple watopoly banner lines (placed roughly in the middle rows)
+    // Must be exactly 4 lines — each side row has 4 content slots; >4 lines
+    // causes the banner to straddle a row border (blank line) creating a gap.
     std::vector<std::string> bannerLines = {
-        " _    _  ___ _____ ___  ___  ___  _   _   _ ",
-        "| |  | |/ _ |_   _/ _ \\| _ \\/ _ \\| | | | | |",
-        "| |/\\| | |_| || || |_| |  _/ |_| | |_| |_| |",
-        "|__/\\__|\\___/ |_| \\___/|_|  \\___/|___|_____|",
+        "#   #  ###  #####  ###  ####   ###  #    #   #",
+        "# # # #   #   #   #   # #   # #   # #     # # ",
+        "## ## #####   #   #   # ####  #   # #      #  ",
+        "#   # #   #   #    ###  #      ###  ##### ###  ",
     };
-    int bannerStart = 2; // which side row to start the banner at
+    int bannerStart = 3; // which side row to start the banner at
 
     for (int r = 0; r < 9; ++r) {
         auto leftCell = renderCell(leftSquares[r]);
