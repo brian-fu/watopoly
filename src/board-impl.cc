@@ -61,9 +61,9 @@ void buildDefaultBoard(Board &board) {
 
     // helper to create an academic building and register it with its block
     auto makeAcad = [&](std::string name, int idx, int cost, int impCost,
-                        std::array<int,6> tuition, MonopolyBlock *blk) {
+                        std::vector<int> tuition, MonopolyBlock *blk) {
         auto sq = std::make_unique<AcademicBuilding>(
-            std::move(name), idx, cost, impCost, tuition, blk);
+            std::move(name), idx, cost, impCost, std::move(tuition), blk);
         blk->addBuilding(sq.get());
         board.setSquare(idx, std::move(sq));
     };

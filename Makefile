@@ -28,7 +28,7 @@ watopoly: $(HEADER_GCM) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJ)
 
 $(HEADER_GCM):
-	$(CXX) $(CXXFLAGS) -xc++-system-header -c iostream vector memory algorithm map random sstream fstream string array cctype utility functional
+	$(CXX) $(CXXFLAGS) -xc++-system-header -c iostream vector memory algorithm map random sstream fstream string utility functional
 	touch $(HEADER_GCM)
 
 src/types.o: src/types.cc $(HEADER_GCM)

@@ -13,7 +13,6 @@ import <iostream>;
 import <sstream>;
 import <fstream>;
 import <algorithm>;
-import <cctype>;
 
 // forward declaration
 class WatopolyGame;

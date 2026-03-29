@@ -13,9 +13,21 @@ import <iostream>;
 import <sstream>;
 import <fstream>;
 import <algorithm>;
-import <cctype>;
 
 Command::~Command() = default;
+
+// helper: string-to-int using istringstream (course-approved conversion)
+static bool tryParseInt(const std::string &s, int &result) {
+    std::istringstream iss{s};
+    return static_cast<bool>(iss >> result);
+}
+
+// helper: int-to-string using ostringstream (course-approved conversion)
+static std::string intToStr(int n) {
+    std::ostringstream oss;
+    oss << n;
+    return oss.str();
+}
 
 // CommandInterpreter
 void CommandInterpreter::registerCommand(std::unique_ptr<Command> cmd) {
@@ -442,7 +454,7 @@ void WatopolyGame::handleTuition(Player &player) {
 
     turn_.phase = TurnPhase::PostRoll;
     handleDebt(player, amount, nullptr);
-    logger_.log(player.getName() + " paid $" + std::to_string(amount) + " tuition");
+    logger_.log(player.getName() + " paid $" + intToStr(amount) + " tuition");
 }
 
 DiceResult WatopolyGame::rollForGym() {
@@ -545,8 +557,8 @@ void WatopolyGame::runAuction(Property &property) {
             if (input == "withdraw") {
                 withdrawn[i] = true;
             } else {
-                try {
-                    int bid = std::stoi(input);
+                int bid = 0;
+                if (tryParseInt(input, bid)) {
                     if (bid > currentBid && bid <= bidders[i]->getCash()) {
                         currentBid = bid;
                         leader = bidders[i];
@@ -555,7 +567,7 @@ void WatopolyGame::runAuction(Property &property) {
                                   << " and within your cash." << std::endl;
                         --i; // retry
                     }
-                } catch (...) {
+                } else {
                     std::cout << "Invalid input." << std::endl;
                     --i;
                 }
@@ -792,10 +804,7 @@ bool RollCommand::execute(WatopolyGame &game, const std::vector<std::string> &ar
     if (game.isTestingMode() && args.size() >= 2) {
         int d1 = 0;
         int d2 = 0;
-        try {
-            d1 = std::stoi(args[0]);
-            d2 = std::stoi(args[1]);
-        } catch (...) {
+        if (!tryParseInt(args[0], d1) || !tryParseInt(args[1], d2)) {
             std::cout << "Testing roll expects integers: roll <die1> <die2>" << std::endl;
             return false;
         }
@@ -814,8 +823,8 @@ bool RollCommand::execute(WatopolyGame &game, const std::vector<std::string> &ar
     if (r.isDoubles) std::cout << " (doubles!)";
     std::cout << std::endl;
 
-    game.eventLogger().log(player.getName() + " rolled " + std::to_string(r.die1) +
-                           "+" + std::to_string(r.die2) + "=" + std::to_string(r.sum));
+    game.eventLogger().log(player.getName() + " rolled " + intToStr(r.die1) +
+                           "+" + intToStr(r.die2) + "=" + intToStr(r.sum));
 
     // triple doubles -> sent to tims
     if (game.getDice().consecutiveDoubles() >= 3) {
@@ -874,11 +883,15 @@ bool TradeCommand::execute(WatopolyGame &game, const std::vector<std::string> &a
     Property *giveProp = nullptr;
     Property *receiveProp = nullptr;
 
-    try { giveCash = std::stoi(args[1]); }
-    catch (...) { giveIsMoney = false; giveProp = game.getBoard().findProperty(args[1]); }
+    if (!tryParseInt(args[1], giveCash)) {
+        giveIsMoney = false;
+        giveProp = game.getBoard().findProperty(args[1]);
+    }
 
-    try { receiveCash = std::stoi(args[2]); }
-    catch (...) { receiveIsMoney = false; receiveProp = game.getBoard().findProperty(args[2]); }
+    if (!tryParseInt(args[2], receiveCash)) {
+        receiveIsMoney = false;
+        receiveProp = game.getBoard().findProperty(args[2]);
+    }
 
     // reject money-for-money
     if (giveIsMoney && receiveIsMoney) {
@@ -1201,7 +1214,7 @@ bool SaveCommand::execute(WatopolyGame &game, const std::vector<std::string> &ar
 bool HistoryCommand::execute(WatopolyGame &game, const std::vector<std::string> &args) {
     int n = -1;
     if (!args.empty()) {
-        try { n = std::stoi(args[0]); } catch (...) {}
+        tryParseInt(args[0], n);
     }
     game.eventLogger().printHistory(n);
     return true;
@@ -1238,7 +1251,9 @@ int WatopolyApp::run(int argc, char **argv) {
         } else if (arg == "-load" && i + 1 < argc) {
             loadFile = argv[++i];
         } else if (arg == "-seed" && i + 1 < argc) {
-            seed = static_cast<unsigned>(std::stoi(argv[++i]));
+            int seedVal = 0;
+            std::string seedArg{argv[++i]};
+            if (tryParseInt(seedArg, seedVal)) seed = static_cast<unsigned>(seedVal);
             hasSeed = true;
         } else if (arg == "-enablelog" || arg == "-enable-log") {
             enableLog = true;

@@ -3,7 +3,6 @@ module core;
 import types;
 import <string>;
 import <vector>;
-import <array>;
 import <algorithm>;
 import <iostream>;
 
@@ -143,10 +142,10 @@ bool MonopolyBlock::hasAnyImprovements() const {
 
 // AcademicBuilding
 AcademicBuilding::AcademicBuilding(std::string name, int index, int cost,
-                                   int improvementCost, std::array<int, 6> tuition,
+                                   int improvementCost, std::vector<int> tuition,
                                    MonopolyBlock *block)
     : Property{std::move(name), index, cost},
-      block_{block}, improvementCost_{improvementCost}, tuition_{tuition} {}
+      block_{block}, improvementCost_{improvementCost}, tuition_{std::move(tuition)} {}
 
 bool AcademicBuilding::canBuyImprovement() const {
     if (!getOwner()) return false;

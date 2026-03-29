@@ -3,7 +3,6 @@ export module core;
 import types;
 import <string>;
 import <vector>;
-import <array>;
 import <iostream>;
 
 // forward declarations within the module
@@ -150,11 +149,11 @@ export class AcademicBuilding : public Property {
     MonopolyBlock *block_;
     int improvementCost_;
     int numImprovements_ = 0;
-    std::array<int, 6> tuition_;
+    std::vector<int> tuition_;
 
 public:
     AcademicBuilding(std::string name, int index, int cost,
-                     int improvementCost, std::array<int, 6> tuition,
+                     int improvementCost, std::vector<int> tuition,
                      MonopolyBlock *block);
 
     MonopolyBlock *getBlock() const { return block_; }
