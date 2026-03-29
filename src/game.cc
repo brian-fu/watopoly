@@ -97,6 +97,7 @@ public:
     int activeCupCount() const override;
     void awardCup(Player &player) override;
     void resolveLanding(Player &player, int squareIndex) override;
+    void logEvent(const std::string &msg) override;
     SLCEvent generateSLCEvent() override;
     int generateNeedlesHallDelta() override;
     bool checkRollUpTheRim() override;

@@ -27,6 +27,9 @@ public:
     virtual void awardCup(Player &player) = 0;
     virtual void resolveLanding(Player &player, int squareIndex) = 0;
 
+    // event logging (action log enhancement)
+    virtual void logEvent(const std::string &msg) = 0;
+
     // rng delegated from squares so core doesn't import dice
     virtual SLCEvent generateSLCEvent() = 0;
     virtual int generateNeedlesHallDelta() = 0;

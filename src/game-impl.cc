@@ -104,8 +104,10 @@ void WatopolyGame::setupNewGame() {
     for (int i = 0; i < numPlayers; ++i) {
         std::string name;
         char token;
-        bool valid = false;
-        while (!valid) {
+
+        // get a valid name first
+        bool nameOk = false;
+        while (!nameOk) {
             std::cout << "Player " << (i + 1) << " name: ";
             std::cin >> name;
             if (name == "BANK") {
@@ -116,6 +118,12 @@ void WatopolyGame::setupNewGame() {
                 std::cout << "That player name is already taken." << std::endl;
                 continue;
             }
+            nameOk = true;
+        }
+
+        // then get a valid piece separately
+        bool pieceOk = false;
+        while (!pieceOk) {
             std::cout << "Choose a piece (G, B, D, P, S, $, L, T): ";
             std::cin >> token;
             if (!isValidPieceChar(token)) {
@@ -126,7 +134,7 @@ void WatopolyGame::setupNewGame() {
                 std::cout << "That piece is already taken." << std::endl;
                 continue;
             }
-            valid = true;
+            pieceOk = true;
         }
         usedNames.push_back(name);
         usedTokens.push_back(token);
@@ -217,20 +225,34 @@ void WatopolyGame::handleTimsLine(Player &player) {
         turn_.phase = TurnPhase::PostRoll;
     };
 
+    // helper: roll dice, respecting testing mode if extra args on the line
+    auto doTimsRoll = [&](std::istringstream &rest) -> DiceResult {
+        if (testingMode_) {
+            int d1 = 0, d2 = 0;
+            if (rest >> d1 >> d2) {
+                return dice_.roll(d1, d2);
+            }
+        }
+        return dice_.roll();
+    };
+
     // first two turns: player may roll, pay, or use a cup
     if (player.timsTurns() < 2) {
         std::cout << "Options: roll (try doubles), pay ($50), cup (use Roll Up the Rim)" << std::endl;
-        std::string choice;
+        std::string line;
         std::cout << "> ";
-        std::cin >> choice;
-        std::cin.ignore(10000, '\n');
+        if (!std::getline(std::cin, line)) return;
+        std::istringstream iss{line};
+        std::string choice;
+        iss >> choice;
 
         if (choice == "roll") {
-            DiceResult r = dice_.roll();
+            DiceResult r = doTimsRoll(iss);
             player.setLastRoll(r);
             std::cout << "Rolled: " << r.die1 << " + " << r.die2 << " = " << r.sum << std::endl;
             if (r.isDoubles) {
                 std::cout << "Doubles! " << player.getName() << " leaves DC Tims Line." << std::endl;
+                logger_.log(player.getName() + " left Tims by rolling doubles");
                 moveAfterLeaving(r.sum);
             } else {
                 player.incrementTimsTurns();
@@ -243,6 +265,7 @@ void WatopolyGame::handleTimsLine(Player &player) {
             handleDebt(player, 50, nullptr);
             if (player.isBankrupt()) return;
             std::cout << player.getName() << " paid $50 to leave DC Tims Line." << std::endl;
+            logger_.log(player.getName() + " left Tims by paying $50");
             DiceResult r = dice_.roll();
             player.setLastRoll(r);
             std::cout << "Rolled: " << r.die1 << " + " << r.die2 << " = " << r.sum << std::endl;
@@ -253,6 +276,7 @@ void WatopolyGame::handleTimsLine(Player &player) {
         if (choice == "cup") {
             if (player.useTimsCup()) {
                 std::cout << player.getName() << " used a Roll Up the Rim cup." << std::endl;
+                logger_.log(player.getName() + " left Tims using a cup");
                 DiceResult r = dice_.roll();
                 player.setLastRoll(r);
                 std::cout << "Rolled: " << r.die1 << " + " << r.die2 << " = " << r.sum << std::endl;
@@ -267,13 +291,27 @@ void WatopolyGame::handleTimsLine(Player &player) {
         return;
     }
 
-    // third turn: must roll first; if no doubles then must pay or use cup and move by that roll
+    // third turn: must roll first; if no doubles then must pay or use cup
     std::cout << "Third turn in line. Rolling for doubles..." << std::endl;
-    DiceResult r = dice_.roll();
+    DiceResult r;
+    if (testingMode_) {
+        // in testing mode, read a line to optionally get dice values
+        std::string line;
+        std::cout << "> ";
+        if (!std::getline(std::cin, line)) return;
+        std::istringstream iss{line};
+        std::string cmd;
+        iss >> cmd;
+        // expect "roll <d1> <d2>" or just auto-roll
+        r = doTimsRoll(iss);
+    } else {
+        r = dice_.roll();
+    }
     player.setLastRoll(r);
     std::cout << "Rolled: " << r.die1 << " + " << r.die2 << " = " << r.sum << std::endl;
     if (r.isDoubles) {
         std::cout << "Doubles! " << player.getName() << " leaves DC Tims Line." << std::endl;
+        logger_.log(player.getName() + " left Tims by rolling doubles (3rd turn)");
         moveAfterLeaving(r.sum);
         return;
     }
@@ -288,6 +326,7 @@ void WatopolyGame::handleTimsLine(Player &player) {
     if (choice == "cup" && player.timsCups() > 0) {
         player.useTimsCup();
         std::cout << player.getName() << " used a Roll Up the Rim cup." << std::endl;
+        logger_.log(player.getName() + " left Tims using a cup (3rd turn)");
         moveAfterLeaving(r.sum);
         return;
     }
@@ -295,6 +334,7 @@ void WatopolyGame::handleTimsLine(Player &player) {
     handleDebt(player, 50, nullptr);
     if (player.isBankrupt()) return;
     std::cout << player.getName() << " paid $50 to leave DC Tims Line." << std::endl;
+    logger_.log(player.getName() + " left Tims by paying $50 (3rd turn)");
     moveAfterLeaving(r.sum);
 }
 
@@ -379,12 +419,12 @@ void WatopolyGame::sendPlayerToTims(Player &player) {
 
 void WatopolyGame::promptPurchase(Player &player, Property &property) {
     std::cout << property.name() << " is unowned. Cost: $" << property.purchaseCost() << std::endl;
-    std::cout << "Would you like to buy it? (y/n): ";
+    std::cout << "Would you like to buy it? (yes/no): ";
     std::string response;
     std::cin >> response;
     std::cin.ignore(10000, '\n');
 
-    if (response == "y" || response == "Y") {
+    if (response == "yes" || response == "Yes" || response == "y" || response == "Y") {
         if (player.getCash() >= property.purchaseCost()) {
             player.deductCash(property.purchaseCost());
             property.setOwner(&player);
@@ -486,6 +526,10 @@ void WatopolyGame::resolveLanding(Player &player, int squareIndex) {
     board_.getSquare(squareIndex).landOn(player, *this);
 }
 
+void WatopolyGame::logEvent(const std::string &msg) {
+    logger_.log(msg);
+}
+
 SLCEvent WatopolyGame::generateSLCEvent() { return rng_.generateSLCEvent(); }
 int WatopolyGame::generateNeedlesHallDelta() { return rng_.generateNeedlesHallDelta(); }
 bool WatopolyGame::checkRollUpTheRim() { return rng_.rollUpTheRimCheck(activeCupCount()); }
@@ -575,13 +619,21 @@ void WatopolyGame::runAuction(Property &property) {
         }
     }
 
-    if (leader && currentBid > 0) {
-        leader->deductCash(currentBid);
-        property.setOwner(leader);
-        leader->addProperty(&property);
-        std::cout << leader->getName() << " won the auction for " << property.name()
+    // if nobody explicitly bid, the last remaining player still wins at $0
+    Player *winner = leader;
+    if (!winner) {
+        for (int i = 0; i < static_cast<int>(bidders.size()); ++i) {
+            if (!withdrawn[i]) { winner = bidders[i]; break; }
+        }
+    }
+
+    if (winner) {
+        if (currentBid > 0) winner->deductCash(currentBid);
+        property.setOwner(winner);
+        winner->addProperty(&property);
+        std::cout << winner->getName() << " won the auction for " << property.name()
                   << " at $" << currentBid << "." << std::endl;
-        logger_.log(leader->getName() + " won auction for " + property.name());
+        logger_.log(winner->getName() + " won auction for " + property.name());
     } else {
         std::cout << "No one bid. " << property.name() << " remains unowned." << std::endl;
     }
@@ -596,7 +648,8 @@ void WatopolyGame::saveGame(const std::string &filename) const {
     }
 
     out << players_.size() << "\n";
-    for (auto &p : players_) {
+    // spec requires current player listed first
+    auto writePl = [&](const std::unique_ptr<Player> &p) {
         out << p->getName() << " " << p->getToken() << " " << p->timsCups()
             << " " << p->getCash() << " " << p->getPosition();
         if (p->getPosition() == 10) {
@@ -607,6 +660,11 @@ void WatopolyGame::saveGame(const std::string &filename) const {
             }
         }
         out << "\n";
+    };
+    int cur = turn_.currentPlayerIndex;
+    int n = static_cast<int>(players_.size());
+    for (int i = 0; i < n; ++i) {
+        writePl(players_[(cur + i) % n]);
     }
 
     // properties in board order
@@ -835,7 +893,13 @@ bool RollCommand::execute(WatopolyGame &game, const std::vector<std::string> &ar
         return true;
     }
 
+    int posBefore = player.getPosition();
     player.moveBy(r.sum);
+    int posAfter = player.getPosition();
+    // detect OSAP crossing (wrapped around but didn't land on 0)
+    if (posAfter > 0 && posAfter < posBefore) {
+        game.eventLogger().log(player.getName() + " crossed OSAP, collected $200");
+    }
     std::cout << player.getName() << " lands on " << game.getBoard().getSquare(player.getPosition()).name()
               << " (square " << player.getPosition() << ")." << std::endl;
     game.resolveLanding(player, player.getPosition());
@@ -995,6 +1059,19 @@ bool TradeCommand::execute(WatopolyGame &game, const std::vector<std::string> &a
         offerer.addProperty(receiveProp);
     }
 
+    // mortgaged property transfer: new owner pays 10% to bank immediately
+    auto handleMortgageTransfer = [](Property *prop, Player *newOwner) {
+        if (prop && prop->isMortgaged()) {
+            int fee = prop->purchaseCost() / 10;
+            if (newOwner->getCash() >= fee) {
+                newOwner->deductCash(fee);
+            }
+            prop->setTransferredMortgaged(true);
+        }
+    };
+    if (giveProp) handleMortgageTransfer(giveProp, target);
+    if (receiveProp) handleMortgageTransfer(receiveProp, &offerer);
+
     std::cout << "Trade completed!" << std::endl;
     game.eventLogger().log(offerer.getName() + " traded with " + target->getName());
     return true;
@@ -1035,6 +1112,7 @@ bool ImproveCommand::execute(WatopolyGame &game, const std::vector<std::string> 
         if (ab->sellImprovement()) {
             std::cout << "Improvement sold on " << ab->name()
                       << ". Now has " << ab->improvements() << " improvements." << std::endl;
+            game.eventLogger().log("improvement sold on " + ab->name());
         } else {
             std::cout << "No improvements to sell." << std::endl;
         }
@@ -1059,10 +1137,10 @@ bool MortgageCommand::execute(WatopolyGame &game, const std::vector<std::string>
     if (prop->getOwner() != &game.currentPlayer()) { std::cout << "Not yours." << std::endl; return false; }
     if (prop->isMortgaged()) { std::cout << "Already mortgaged." << std::endl; return false; }
 
-    // must sell improvements first
+    // must sell all improvements in the block first
     if (prop->isAcademic()) {
         auto *ab = static_cast<AcademicBuilding *>(prop);
-        if (ab->improvements() > 0) {
+        if (ab->getBlock()->hasAnyImprovements()) {
             std::cout << "Sell improvements first." << std::endl;
             return false;
         }
@@ -1105,6 +1183,7 @@ bool UnmortgageCommand::execute(WatopolyGame &game, const std::vector<std::strin
     game.currentPlayer().deductCash(cost);
     prop->unmortgage();
     std::cout << prop->name() << " unmortgaged for $" << cost << "." << std::endl;
+    game.eventLogger().log(game.currentPlayer().getName() + " unmortgaged " + prop->name());
     return true;
 }
 

@@ -5,6 +5,13 @@ import <string>;
 import <vector>;
 import <algorithm>;
 import <iostream>;
+import <sstream>;
+
+static std::string itos(int n) {
+    std::ostringstream oss;
+    oss << n;
+    return oss.str();
+}
 
 // Player
 Player::Player(std::string name, PieceType token, int cash)
@@ -116,6 +123,7 @@ void Property::landOn(Player &player, IGameContext &game) {
         int fee = calculateFee(player, game);
         std::cout << player.getName() << " owes $" << fee
                   << " to " << owner_->getName() << "." << std::endl;
+        game.logEvent(player.getName() + " paid $" + itos(fee) + " rent to " + owner_->getName());
         game.handleDebt(player, fee, owner_);
     }
 }
@@ -152,6 +160,10 @@ bool AcademicBuilding::canBuyImprovement() const {
     if (numImprovements_ >= 5) return false;
     if (!block_->isOwnedBy(*getOwner())) return false;
     if (getOwner()->getCash() < improvementCost_) return false;
+    // even improvement rule: can only improve if at the minimum level in the block
+    for (auto *b : block_->buildings()) {
+        if (b->improvements() < numImprovements_) return false;
+    }
     return true;
 }
 
@@ -164,6 +176,10 @@ bool AcademicBuilding::buyImprovement() {
 
 bool AcademicBuilding::sellImprovement() {
     if (numImprovements_ <= 0) return false;
+    // even sell rule: can only sell from the most-improved in the block
+    for (auto *b : block_->buildings()) {
+        if (b->improvements() > numImprovements_) return false;
+    }
     --numImprovements_;
     getOwner()->addCash(improvementCost_ / 2);
     return true;
@@ -217,9 +233,10 @@ int Gym::calculateFee(Player &, IGameContext &game) {
 // CollectOSAP
 CollectOSAP::CollectOSAP(int index) : Square{"Collect OSAP", index} {}
 
-void CollectOSAP::landOn(Player &player, IGameContext &) {
+void CollectOSAP::landOn(Player &player, IGameContext &game) {
     player.addCash(200);
     std::cout << player.getName() << " landed on Collect OSAP and received $200." << std::endl;
+    game.logEvent(player.getName() + " collected $200 from OSAP");
 }
 
 // DCTimsLine
@@ -257,6 +274,7 @@ CoopFee::CoopFee(int index) : Square{"Coop Fee", index} {}
 
 void CoopFee::landOn(Player &player, IGameContext &game) {
     std::cout << player.getName() << " pays $150 coop fee." << std::endl;
+    game.logEvent(player.getName() + " paid $150 coop fee");
     game.handleDebt(player, 150, nullptr);
 }
 
@@ -283,10 +301,12 @@ void SLCSquare::landOn(Player &player, IGameContext &game) {
         case SLCEvent::Forward3: offset = 3; break;
         case SLCEvent::GoToTims:
             std::cout << player.getName() << " is sent to DC Tims Line by SLC!" << std::endl;
+            game.logEvent(player.getName() + " sent to Tims by SLC");
             game.sendPlayerToTims(player);
             return;
         case SLCEvent::AdvanceToOSAP:
             std::cout << player.getName() << " advances to Collect OSAP!" << std::endl;
+            game.logEvent(player.getName() + " advanced to OSAP by SLC");
             player.moveTo(0);
             game.resolveLanding(player, 0);
             return;
@@ -295,6 +315,7 @@ void SLCSquare::landOn(Player &player, IGameContext &game) {
     int newPos = (player.getPosition() + offset + 40) % 40;
     std::cout << player.getName() << " moves " << offset << " squares to square "
               << newPos << "." << std::endl;
+    game.logEvent(player.getName() + " moved " + itos(offset) + " by SLC to square " + itos(newPos));
     player.moveTo(newPos);
     game.resolveLanding(player, newPos);
 }
@@ -314,8 +335,10 @@ void NeedlesHallSquare::landOn(Player &player, IGameContext &game) {
     if (delta >= 0) {
         std::cout << player.getName() << " gains $" << delta << " from Needles Hall." << std::endl;
         player.addCash(delta);
+        game.logEvent(player.getName() + " gained $" + itos(delta) + " from Needles Hall");
     } else {
         std::cout << player.getName() << " loses $" << -delta << " from Needles Hall." << std::endl;
+        game.logEvent(player.getName() + " lost $" + itos(-delta) + " from Needles Hall");
         game.handleDebt(player, -delta, nullptr);
     }
 }
