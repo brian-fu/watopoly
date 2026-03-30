@@ -1203,7 +1203,8 @@ bool ImproveCommand::execute(WatopolyGame &game, const std::vector<std::string> 
             std::cout << "No improvements to sell." << std::endl;
         }
     } else {
-        std::cout << "Usage: improve <property> buy/sell" << std::endl;
+        std::cout << "Invalid improve action: '" << args[1]
+                  << "'. Use 'buy' or 'sell'." << std::endl;
         return false;
     }
     return true;

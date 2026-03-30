@@ -1,0 +1,451 @@
+@startuml
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "Core Engine" {
+  interface IGameContext {
+    +void sendPlayerToTims(Player &player)
+    +void promptPurchase(Player &player, Property &property)
+    +void handleDebt(Player &debtor, int amount, Player *creditor)
+    +void handleTuition(Player &player)
+    +DiceResult rollForGym()
+    +int activeCupCount() const
+    +void awardCup(Player &player)
+    +void resolveLanding(Player &player, int squareIndex)
+    +void logEvent(const std::string &msg)
+    +SLCEvent generateSLCEvent()
+    +int generateNeedlesHallDelta()
+    +bool checkRollUpTheRim()
+    +TurnPhase getCurrentPhase() const
+    +Player &currentPlayer()
+    +std::vector<Player *> getActivePlayers()
+    +Player *findPlayer(const std::string &name)
+  }
+
+  class WatopolyGame {
+    +void setupNewGame()
+    +void loadGame(const std::string &filename)
+    +void run()
+    +Board &getBoard()
+    +const Board &getBoard() const
+    +TurnContext &turnContext()
+    +Dice &getDice()
+    +bool isTestingMode() const
+    +bool isReplayEnabled() const
+    +EventLogger &eventLogger()
+    +const std::vector<std::unique_ptr<Player>> &playerList() const
+    +GameSnapshot snapshot() const
+    +void redraw()
+    +void runAuction(Property &property)
+    +void saveGame(const std::string &filename) const
+    +void replayEventsFromFile(const std::string &filename) const
+    +void printAssets(const Player &player) const
+    -void setupCommands()
+    -void processTurn()
+    -void handleTimsLine(Player &player)
+    -bool isGameOver() const
+    -void announceWinner() const
+  }
+
+  class WatopolyApp {
+    +int run(int argc, char **argv)
+  }
+
+  class Board {
+    +Square &getSquare(int pos)
+    +const Square &getSquare(int pos) const
+    +int positionOf(const std::string &name) const
+    +int numSquares() const
+    +std::vector<MonopolyBlock> &monopolyBlocks()
+    +const std::vector<MonopolyBlock> &monopolyBlocks() const
+    +void setSquare(int pos, std::unique_ptr<Square> sq)
+    +void addBlock(MonopolyBlock block)
+    +Property *findProperty(const std::string &name)
+  }
+
+  class Player {
+    +const std::string &getName() const
+    +char getToken() const
+    +PieceType getTokenType() const
+    +int getCash() const
+    +int getPosition() const
+    +void addCash(int amount)
+    +bool deductCash(int amount)
+    +void moveBy(int steps)
+    +void moveTo(int position)
+    +void addProperty(Property *prop)
+    +void removeProperty(Property *prop)
+    +const std::vector<Property *> &properties() const
+    +int getTotalWorth() const
+    +bool isInTimsLine() const
+    +void enterTimsLine()
+    +void leaveTimsLine()
+    +int timsTurns() const
+    +void incrementTimsTurns()
+    +int timsCups() const
+    +void addTimsCup()
+    +bool useTimsCup()
+    +void declareBankruptcy()
+    +bool isBankrupt() const
+    +DiceResult getLastRoll() const
+    +void setLastRoll(DiceResult r)
+    +void setPosition(int pos)
+    +void setCash(int c)
+    +void setTimsCups(int n)
+    +void setTimsTurns(int n)
+    +void setInTimsLine(bool v)
+  }
+
+  class Dice {
+    +DiceResult roll()
+    +DiceResult roll(int die1, int die2)
+    +void resetConsecutiveDoubles()
+    +int consecutiveDoubles() const
+  }
+
+  struct DiceResult {
+    +int die1
+    +int die2
+    +int sum
+    +bool isDoubles
+  }
+
+  struct TurnContext {
+    +int currentPlayerIndex
+    +TurnPhase phase
+    +int consecutiveDoubles
+    +DiceResult lastRoll
+    +Player *debtCreditor
+    +int debtAmount
+  }
+}
+
+package "Squares" {
+  abstract class Square {
+    +std::string name() const
+    +int index() const
+    +{abstract} void landOn(Player &player, IGameContext &game)
+    +bool isProperty() const
+    +bool isAcademic() const
+  }
+
+  abstract class Property {
+    +Player *getOwner() const
+    +void setOwner(Player *p)
+    +int purchaseCost() const
+    +bool isMortgaged() const
+    +void mortgage()
+    +void unmortgage()
+    +bool wasTransferredMortgaged() const
+    +void setTransferredMortgaged(bool v)
+    +void landOn(Player &player, IGameContext &game)
+    +{abstract} int calculateFee(Player &visitor, IGameContext &game)
+  }
+
+  class AcademicBuilding {
+    +MonopolyBlock *getBlock() const
+    +int improvementCost() const
+    +int improvements() const
+    +void setImprovements(int n)
+    +bool canBuyImprovement() const
+    +bool buyImprovement()
+    +bool sellImprovement()
+    +int calculateFee(Player &visitor, IGameContext &game)
+  }
+
+  class Residence {
+    +int calculateFee(Player &visitor, IGameContext &game)
+  }
+
+  class Gym {
+    +int calculateFee(Player &visitor, IGameContext &game)
+  }
+
+  class CollectOSAP {
+    +void landOn(Player &player, IGameContext &game)
+  }
+
+  class DCTimsLine {
+    +void landOn(Player &player, IGameContext &game)
+  }
+
+  class GoToTims {
+    +void landOn(Player &player, IGameContext &game)
+  }
+
+  class GooseNesting {
+    +void landOn(Player &player, IGameContext &game)
+  }
+
+  class TuitionSquare {
+    +void landOn(Player &player, IGameContext &game)
+  }
+
+  class CoopFee {
+    +void landOn(Player &player, IGameContext &game)
+  }
+
+  class SLCSquare {
+    +void landOn(Player &player, IGameContext &game)
+  }
+
+  class NeedlesHallSquare {
+    +void landOn(Player &player, IGameContext &game)
+  }
+
+  Square <|-- Property
+  Property <|-- AcademicBuilding
+  Property <|-- Residence
+  Property <|-- Gym
+
+  Square <|-- CollectOSAP
+  Square <|-- DCTimsLine
+  Square <|-- GoToTims
+  Square <|-- GooseNesting
+  Square <|-- TuitionSquare
+  Square <|-- CoopFee
+  Square <|-- SLCSquare
+  Square <|-- NeedlesHallSquare
+}
+
+package "Ownership & Economy" {
+  class MonopolyBlock {
+    +std::string name() const
+    +void addBuilding(AcademicBuilding *b)
+    +std::vector<AcademicBuilding *> buildings() const
+    +bool isOwnedBy(Player const &player) const
+    +bool hasAnyImprovements() const
+  }
+}
+
+package "Command Layer" {
+  class CommandInterpreter {
+    +void registerCommand(std::unique_ptr<Command> cmd)
+    +bool executeLine(const std::string &line, WatopolyGame &game)
+  }
+
+  abstract class Command {
+    +{abstract} std::string cmdName() const
+    +{abstract} bool execute(WatopolyGame &game, const std::vector<std::string> &args)
+    +{abstract} bool isValidInPhase(TurnPhase phase) const
+  }
+
+  class RollCommand
+  class NextCommand
+  class TradeCommand
+  class ImproveCommand
+  class MortgageCommand
+  class UnmortgageCommand
+  class BankruptCommand
+  class AssetsCommand
+  class AllCommand
+  class SaveCommand
+  class HistoryCommand
+  class ReplayCommand
+
+  Command <|-- RollCommand
+  Command <|-- NextCommand
+  Command <|-- TradeCommand
+  Command <|-- ImproveCommand
+  Command <|-- MortgageCommand
+  Command <|-- UnmortgageCommand
+  Command <|-- BankruptCommand
+  Command <|-- AssetsCommand
+  Command <|-- AllCommand
+  Command <|-- SaveCommand
+  Command <|-- HistoryCommand
+  Command <|-- ReplayCommand
+}
+
+package "Presentation" {
+  abstract class DisplayObserver {
+    +{abstract} void update(const GameSnapshot &snap)
+  }
+
+  class DisplayHub {
+    +void attach(DisplayObserver *obs)
+    +void detach(DisplayObserver *obs)
+    +void publish(const GameSnapshot &snap)
+  }
+
+  class BoardDisplay {
+    +void update(const GameSnapshot &snap)
+  }
+
+  class EventLogger {
+    +void setEnabled(bool on)
+    +bool isEnabled() const
+    +void log(const std::string &msg)
+    +void printHistory(int n = -1) const
+    +const std::vector<std::string> &events() const
+  }
+
+  struct GameSnapshot {
+    +SquareInfo squares[40]
+    +std::vector<PlayerInfo> players
+  }
+
+  struct SquareInfo {
+    +std::string name
+    +bool isProperty
+    +bool isAcademic
+    +std::string ownerName
+    +int improvements
+    +bool mortgaged
+  }
+
+  struct PlayerInfo {
+    +std::string name
+    +char token
+    +int cash
+    +int position
+    +int timsCups
+    +bool inTimsLine
+    +bool bankrupt
+  }
+
+  DisplayObserver <|-- BoardDisplay
+}
+
+package "Randomness" {
+  class RandomEventGenerator {
+    +void seed(unsigned value)
+    +int rollDie()
+    +SLCEvent generateSLCEvent()
+    +int generateNeedlesHallDelta()
+    +bool rollUpTheRimCheck(int activeCupCount)
+  }
+
+  enum SLCEvent {
+    Back3
+    Back2
+    Back1
+    Forward1
+    Forward2
+    Forward3
+    GoToTims
+    AdvanceToOSAP
+  }
+}
+
+enum TurnPhase {
+  PreRoll
+  Rolling
+  PostRoll
+  DebtResolution
+  TuitionDecision
+}
+
+enum PieceType {
+  Goose
+  GRTBus
+  Doughnut
+  Professor
+  Student
+  Money
+  Laptop
+  PinkTie
+}
+
+' Core ownership
+WatopolyApp ..> WatopolyGame : creates
+WatopolyGame "1" o-- "1" Board
+WatopolyGame "1" o-- "2..6" Player
+WatopolyGame "1" o-- "1" Dice
+WatopolyGame "1" o-- "1" CommandInterpreter
+WatopolyGame "1" o-- "1" RandomEventGenerator
+WatopolyGame "1" o-- "1" TurnContext
+WatopolyGame "1" o-- "1" DisplayHub
+WatopolyGame "1" o-- "1" BoardDisplay
+WatopolyGame "1" o-- "1" EventLogger
+WatopolyGame ..|> IGameContext
+WatopolyGame ..> TurnPhase
+
+' Board owns all squares and all monopoly blocks
+Board "1" o-- "40" Square
+Board "1" o-- "8" MonopolyBlock
+
+' DisplayHub manages observers
+DisplayHub "1" o-- "*" DisplayObserver
+DisplayObserver ..> GameSnapshot
+
+' Player-Property links (non-owning back-pointers)
+Player "1" --> "*" Property : owns >
+Property "0..1" --> "1" Player : owner
+
+' Squares depend on the IGameContext abstraction, not on concrete WatopolyGame
+Square ..> IGameContext
+
+' Commands depend on concrete WatopolyGame (differs from DD1 plan)
+Command ..> WatopolyGame
+
+' Gym fee uses Player::getLastRoll() (movement roll)
+Gym ..> DiceResult
+
+' AcademicBuilding holds a non-owning reference to its MonopolyBlock;
+' MonopolyBlock holds non-owning references back to its buildings (Board is sole owner of both)
+AcademicBuilding "1" --> "1" MonopolyBlock
+MonopolyBlock "1" --> "2..3" AcademicBuilding
+
+' Command registry uses unique_ptr internally (no raw owning pointers)
+CommandInterpreter "1" o-- "*" Command
+
+' Randomness
+Dice ..> RandomEventGenerator
+RandomEventGenerator ..> SLCEvent
+
+' Enums
+Player ..> PieceType
+
+note right of IGameContext
+  Dependency Inversion: all Squares
+  depend on this narrow interface,
+  not on the concrete WatopolyGame.
+  WatopolyGame implements IGameContext.
+  Commands depend on WatopolyGame
+  directly (see design doc for rationale).
+end note
+
+note right of TurnContext
+  Centralises all per-turn mutable state:
+  - consecutiveDoubles (for triple-doubles jail)
+  - lastRoll exists in struct but is not used in current flow
+    (Player::lastRoll is used by Gym / Tims flow)
+  - debtCreditor (null means owed to Bank)
+  - debtAmount (debt being resolved)
+  - currentPlayerIndex and TurnPhase
+end note
+
+note right of Board
+  Board is a pure container.
+  All 40 squares and 8 MonopolyBlocks are
+  constructed by the free function
+  buildDefaultBoard(Board &) — Board itself
+  has no knowledge of specific square types.
+  Observer role moved to DisplayHub.
+end note
+
+note bottom of Property
+  Mortgage state:
+  - Mortgaged properties charge no fee
+  - Unmortgage cost = 60% of purchase cost
+  - transferredMortgaged flag tracks properties
+    received via trade or bankruptcy transfer
+    (incur immediate 10% Bank fee; extra 10%
+    applies if recipient unmortgages later)
+end note
+
+note bottom of DisplayHub
+  DisplayHub replaced Board as the
+  Observer Subject. It publishes
+  GameSnapshot structs rather than
+  passing Board & Player references.
+end note
+
+note bottom of PieceType
+  toChar / fromChar are explicit mappings:
+  Goose=G, GRTBus=B, Doughnut=D, Professor=P,
+  Student=S, Money=$, Laptop=L, PinkTie=T.
+end note
+
+@enduml
