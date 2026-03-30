@@ -146,7 +146,7 @@ void BoardDisplay::update(const GameSnapshot &snap) {
         "#   #  ###  #####  ###  ####   ###  #    #   #",
         "# # # #   #   #   #   # #   # #   # #     # # ",
         "## ## #####   #   #   # ####  #   # #      #  ",
-        "#   # #   #   #    ###  #      ###  ##### ###  ",
+        "#   # #   #   #    ###  #      ###  #####  #   ",
     };
     int bannerStart = 3; // which side row to start the banner at
 
