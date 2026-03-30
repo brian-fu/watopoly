@@ -29,6 +29,34 @@ static std::string intToStr(int n) {
     return oss.str();
 }
 
+static int playerIndexOf(const WatopolyGame &game, const Player *player) {
+    auto const &players = game.playerList();
+    for (int i = 0; i < static_cast<int>(players.size()); ++i) {
+        if (players[i].get() == player) return i;
+    }
+    return -1;
+}
+
+// Collect a mandatory immediate payment from any player, even if they are not
+// currently the active player in the outer command flow.
+static bool collectImmediateBankFee(WatopolyGame &game, Player &payer, int fee) {
+    if (fee <= 0) return true;
+    if (payer.getCash() >= fee) {
+        payer.deductCash(fee);
+        return true;
+    }
+
+    int payerIdx = playerIndexOf(game, &payer);
+    if (payerIdx < 0) return false;
+
+    TurnContext saved = game.turnContext();
+    game.turnContext().currentPlayerIndex = payerIdx;
+    game.handleDebt(payer, fee, nullptr);
+    bool paid = !payer.isBankrupt() && game.turnContext().phase != TurnPhase::DebtResolution;
+    game.turnContext() = saved;
+    return paid;
+}
+
 // CommandInterpreter
 void CommandInterpreter::registerCommand(std::unique_ptr<Command> cmd) {
     std::string name = cmd->cmdName();
@@ -1028,12 +1056,51 @@ bool TradeCommand::execute(WatopolyGame &game, const std::vector<std::string> &a
         return false;
     }
 
-    // execute trade
+    // validate that immediate 10% mortgage-transfer fees can be paid
+    int offererCashAfterCore = offerer.getCash();
+    int targetCashAfterCore = target->getCash();
+
     if (giveIsMoney) {
-        if (!offerer.deductCash(giveCash)) {
+        if (offererCashAfterCore < giveCash) {
             std::cout << "You do not have enough cash for this trade." << std::endl;
             return false;
         }
+        offererCashAfterCore -= giveCash;
+        targetCashAfterCore += giveCash;
+    }
+    if (receiveIsMoney) {
+        if (targetCashAfterCore < receiveCash) {
+            std::cout << target->getName() << " does not have enough cash for this trade." << std::endl;
+            return false;
+        }
+        targetCashAfterCore -= receiveCash;
+        offererCashAfterCore += receiveCash;
+    }
+
+    int offererMortgageFee = 0;
+    int targetMortgageFee = 0;
+    if (receiveProp && receiveProp->isMortgaged()) {
+        offererMortgageFee = receiveProp->purchaseCost() / 10;
+    }
+    if (giveProp && giveProp->isMortgaged()) {
+        targetMortgageFee = giveProp->purchaseCost() / 10;
+    }
+    if (offererMortgageFee > 0 && offererCashAfterCore < offererMortgageFee) {
+        std::cout << offerer.getName()
+                  << " cannot pay the mandatory immediate 10% mortgage transfer fee ($"
+                  << offererMortgageFee << ")." << std::endl;
+        return false;
+    }
+    if (targetMortgageFee > 0 && targetCashAfterCore < targetMortgageFee) {
+        std::cout << target->getName()
+                  << " cannot pay the mandatory immediate 10% mortgage transfer fee ($"
+                  << targetMortgageFee << ")." << std::endl;
+        return false;
+    }
+
+    // execute trade
+    if (giveIsMoney) {
+        offerer.deductCash(giveCash);
         target->addCash(giveCash);
     } else if (giveProp) {
         offerer.removeProperty(giveProp);
@@ -1042,19 +1109,7 @@ bool TradeCommand::execute(WatopolyGame &game, const std::vector<std::string> &a
     }
 
     if (receiveIsMoney) {
-        if (!target->deductCash(receiveCash)) {
-            // rollback give side
-            if (giveIsMoney) {
-                target->deductCash(giveCash);
-                offerer.addCash(giveCash);
-            } else if (giveProp) {
-                target->removeProperty(giveProp);
-                giveProp->setOwner(&offerer);
-                offerer.addProperty(giveProp);
-            }
-            std::cout << target->getName() << " does not have enough cash for this trade." << std::endl;
-            return false;
-        }
+        target->deductCash(receiveCash);
         offerer.addCash(receiveCash);
     } else if (receiveProp) {
         target->removeProperty(receiveProp);
@@ -1066,9 +1121,7 @@ bool TradeCommand::execute(WatopolyGame &game, const std::vector<std::string> &a
     auto handleMortgageTransfer = [](Property *prop, Player *newOwner) {
         if (prop && prop->isMortgaged()) {
             int fee = prop->purchaseCost() / 10;
-            if (newOwner->getCash() >= fee) {
-                newOwner->deductCash(fee);
-            }
+            newOwner->deductCash(fee);
             prop->setTransferredMortgaged(true);
         }
     };
@@ -1208,36 +1261,7 @@ bool BankruptCommand::execute(WatopolyGame &game, const std::vector<std::string>
     Player &player = game.currentPlayer();
     Player *creditor = game.turnContext().debtCreditor;
 
-    if (creditor) {
-        // bankrupt to another player: transfer all assets
-        std::cout << player.getName() << " declares bankruptcy to " << creditor->getName() << "!" << std::endl;
-
-        creditor->addCash(player.getCash());
-        // transfer cups
-        while (player.timsCups() > 0) {
-            player.useTimsCup();
-            creditor->addTimsCup();
-        }
-
-        // transfer properties
-        auto props = player.properties();
-        for (auto *prop : props) {
-            // mortgaged property: creditor pays 10% immediately
-            if (prop->isMortgaged()) {
-                int fee = prop->purchaseCost() / 10;
-                if (creditor->getCash() >= fee) {
-                    creditor->deductCash(fee);
-                } else {
-                    // creditor can't afford, property stays mortgaged
-                }
-                prop->setTransferredMortgaged(true);
-            }
-            prop->setOwner(creditor);
-            creditor->addProperty(prop);
-            player.removeProperty(prop);
-        }
-    } else {
-        // bankrupt to the bank: properties go to auction
+    auto bankruptToBank = [&]() {
         std::cout << player.getName() << " declares bankruptcy to the Bank!" << std::endl;
         player.declareBankruptcy();
         while (player.timsCups() > 0) player.useTimsCup();
@@ -1255,6 +1279,48 @@ bool BankruptCommand::execute(WatopolyGame &game, const std::vector<std::string>
             game.runAuction(*prop);
         }
         // cups are destroyed
+    };
+
+    if (creditor) {
+        // bankrupt to another player: transfer all assets
+        std::cout << player.getName() << " declares bankruptcy to " << creditor->getName() << "!" << std::endl;
+
+        creditor->addCash(player.getCash());
+        // transfer cups
+        while (player.timsCups() > 0) {
+            player.useTimsCup();
+            creditor->addTimsCup();
+        }
+
+        // transfer properties
+        auto props = player.properties();
+        for (auto *prop : props) {
+            // mortgaged property: creditor pays 10% immediately
+            if (prop->isMortgaged()) {
+                int fee = prop->purchaseCost() / 10;
+                if (!collectImmediateBankFee(game, *creditor, fee)) {
+                    std::cout << creditor->getName()
+                              << " could not pay the mandatory immediate 10% mortgage transfer fee ($"
+                              << fee << ") for " << prop->name()
+                              << ". The property is returned to the Bank for auction." << std::endl;
+                    prop->setOwner(nullptr);
+                    if (prop->isMortgaged()) prop->unmortgage();
+                    if (prop->isAcademic()) {
+                        static_cast<AcademicBuilding *>(prop)->setImprovements(0);
+                    }
+                    player.removeProperty(prop);
+                    game.runAuction(*prop);
+                    continue;
+                }
+                prop->setTransferredMortgaged(true);
+            }
+            prop->setOwner(creditor);
+            creditor->addProperty(prop);
+            player.removeProperty(prop);
+        }
+    } else {
+        // bankrupt to the bank: properties go to auction
+        bankruptToBank();
     }
 
     if (!player.isBankrupt()) {
