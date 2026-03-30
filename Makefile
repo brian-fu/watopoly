@@ -5,11 +5,9 @@ CXX = g++-14
 BASE_CXXFLAGS = -std=c++20 -Wall -Wextra -g -fmodules-ts
 
 ifeq ($(UNAME_S),Darwin)
-	# macOS specific flags (Your friend's environment)
 	SDKROOT = $(shell xcrun --show-sdk-path)
 	OS_CXXFLAGS = -isysroot $(SDKROOT) -I/opt/X11/include -I/usr/X11/include
 else ifeq ($(UNAME_S),Linux)
-	# WSL2 / Linux specific flags (Your environment)
 	OS_CXXFLAGS = 
 endif
 

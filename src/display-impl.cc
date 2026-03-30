@@ -118,11 +118,19 @@ void BoardDisplay::update(const GameSnapshot &snap) {
         return s;
     };
 
+    auto topBorder = [&]() -> std::string {
+        std::string s = "_";
+        for (int c = 0; c < COLS; ++c) {
+            s += std::string(W, '_') + "_";
+        }
+        return s;
+    };
+
     // top row: squares 20..30
     int topSquares[11] = {20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30};
     std::vector<std::vector<std::string>> topCells;
     for (int i = 0; i < 11; ++i) topCells.push_back(renderCell(topSquares[i]));
-
+    std::cout << topBorder() << "\n";
     for (int line = 0; line < 4; ++line) {
         std::string row = "|";
         for (int c = 0; c < 11; ++c) {
@@ -175,10 +183,20 @@ void BoardDisplay::update(const GameSnapshot &snap) {
         }
 
         // side row border
-        std::string sideBorder = "|" + std::string(W, '_') + "|";
-        sideBorder += std::string(midWidth, ' ');
-        sideBorder += "|" + std::string(W, '_') + "|";
-        std::cout << sideBorder << "\n";
+        // For the final side row (right above the bottom row), use the same
+        // full-width separator style, but without interior '|' separators in
+        // the middle area (prevents vertical ticks sticking up there).
+        if (r == 8) {
+            std::string bottomTransition = "|" + std::string(W, '_') + "|";
+            bottomTransition += std::string(midWidth, '_');
+            bottomTransition += "|" + std::string(W, '_') + "|";
+            std::cout << bottomTransition << "\n";
+        } else {
+            std::string sideBorder = "|" + std::string(W, '_') + "|";
+            sideBorder += std::string(midWidth, ' ');
+            sideBorder += "|" + std::string(W, '_') + "|";
+            std::cout << sideBorder << "\n";
+        }
     }
 
     // bottom row: squares 10..0 (left to right)
