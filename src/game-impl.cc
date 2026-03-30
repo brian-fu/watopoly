@@ -317,13 +317,22 @@ void WatopolyGame::handleTimsLine(Player &player) {
     }
 
     std::cout << "No doubles. You must pay $50 or use a Roll Up the Rim cup." << std::endl;
-    std::string forcedChoice = (player.timsCups() > 0 ? "cup/pay" : "pay");
+    bool hasCup = player.timsCups() > 0;
+    std::string forcedChoice = (hasCup ? "cup/pay" : "pay");
     std::cout << "Choose " << forcedChoice << ": ";
     std::string choice;
-    std::cin >> choice;
-    std::cin.ignore(10000, '\n');
+    while (true) {
+        std::cin >> choice;
+        std::cin.ignore(10000, '\n');
+        if (choice == "pay") break;
+        if (choice == "cup" && hasCup) break;
+        if (choice == "cup" && !hasCup)
+            std::cout << "You don't have any Roll Up the Rim cups. Enter 'pay': ";
+        else
+            std::cout << "Invalid input. Choose " << forcedChoice << ": ";
+    }
 
-    if (choice == "cup" && player.timsCups() > 0) {
+    if (choice == "cup") {
         player.useTimsCup();
         std::cout << player.getName() << " used a Roll Up the Rim cup." << std::endl;
         logger_.log(player.getName() + " left Tims using a cup (3rd turn)");
@@ -421,8 +430,13 @@ void WatopolyGame::promptPurchase(Player &player, Property &property) {
     std::cout << property.name() << " is unowned. Cost: $" << property.purchaseCost() << std::endl;
     std::cout << "Would you like to buy it? (yes/no): ";
     std::string response;
-    std::cin >> response;
-    std::cin.ignore(10000, '\n');
+    while (true) {
+        std::cin >> response;
+        std::cin.ignore(10000, '\n');
+        if (response == "yes" || response == "Yes" || response == "y" || response == "Y" ||
+            response == "no"  || response == "No"  || response == "n" || response == "N") break;
+        std::cout << "Invalid input. Please enter 'yes' or 'no': ";
+    }
 
     if (response == "yes" || response == "Yes" || response == "y" || response == "Y") {
         if (player.getCash() >= property.purchaseCost()) {
@@ -480,8 +494,12 @@ void WatopolyGame::handleTuition(Player &player) {
     std::cout << "Enter '1' for $300, '2' for 10%: ";
 
     std::string choice;
-    std::cin >> choice;
-    std::cin.ignore(10000, '\n');
+    while (true) {
+        std::cin >> choice;
+        std::cin.ignore(10000, '\n');
+        if (choice == "1" || choice == "2") break;
+        std::cout << "Invalid input. Please enter '1' or '2': ";
+    }
 
     int amount;
     if (choice == "2") {
