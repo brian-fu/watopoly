@@ -922,7 +922,9 @@ bool NextCommand::execute(WatopolyGame &game, const std::vector<std::string> &) 
 
 // TradeCommand
 bool TradeCommand::isValidInPhase(TurnPhase phase) const {
-    return phase == TurnPhase::PreRoll || phase == TurnPhase::PostRoll;
+    return phase == TurnPhase::PreRoll
+        || phase == TurnPhase::PostRoll
+        || phase == TurnPhase::DebtResolution;
 }
 
 bool TradeCommand::execute(WatopolyGame &game, const std::vector<std::string> &args) {
@@ -1080,7 +1082,9 @@ bool TradeCommand::execute(WatopolyGame &game, const std::vector<std::string> &a
 
 // ImproveCommand
 bool ImproveCommand::isValidInPhase(TurnPhase phase) const {
-    return phase == TurnPhase::PreRoll || phase == TurnPhase::PostRoll;
+    return phase == TurnPhase::PreRoll
+        || phase == TurnPhase::PostRoll
+        || phase == TurnPhase::DebtResolution;
 }
 
 bool ImproveCommand::execute(WatopolyGame &game, const std::vector<std::string> &args) {
@@ -1102,6 +1106,10 @@ bool ImproveCommand::execute(WatopolyGame &game, const std::vector<std::string> 
     }
 
     if (args[1] == "buy") {
+        if (game.getCurrentPhase() == TurnPhase::DebtResolution) {
+            std::cout << "Cannot buy improvements while resolving debt." << std::endl;
+            return false;
+        }
         if (ab->buyImprovement()) {
             std::cout << "Improvement bought on " << ab->name()
                       << ". Now has " << ab->improvements() << " improvements." << std::endl;
@@ -1117,6 +1125,9 @@ bool ImproveCommand::execute(WatopolyGame &game, const std::vector<std::string> 
         } else {
             std::cout << "No improvements to sell." << std::endl;
         }
+    } else {
+        std::cout << "Usage: improve <property> buy/sell" << std::endl;
+        return false;
     }
     return true;
 }
