@@ -210,11 +210,9 @@ int Residence::calculateFee(Player &, IGameContext &) {
 Gym::Gym(std::string name, int index)
     : Property{std::move(name), index, 150} {}
 
-int Gym::calculateFee(Player &, IGameContext &game) {
-    // gym fee uses separate roll (not Dice, avoids doubles contamination)
-    DiceResult r = game.rollForGym();
-    std::cout << "Gym fee roll: " << r.die1 << " + " << r.die2
-              << " = " << r.sum << std::endl;
+int Gym::calculateFee(Player &visitor, IGameContext &) {
+    // use the movement roll that landed the visitor on this gym
+    DiceResult r = visitor.getLastRoll();
     int gymsOwned = 0;
     for (auto *prop : getOwner()->properties()) {
         if (dynamic_cast<Gym *>(prop)) ++gymsOwned;
