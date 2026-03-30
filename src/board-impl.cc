@@ -167,8 +167,8 @@ void buildDefaultBoard(Board &board) {
     // square 32: ESC (Sci2)
     makeAcad("ESC", 32, 300, 200, {26, 130, 390, 900, 1100, 1275}, sci2);
 
-    // square 33: Needles Hall
-    board.setSquare(33, std::make_unique<NeedlesHallSquare>("Needles Hall", 33));
+    // square 33: SLC
+    board.setSquare(33, std::make_unique<SLCSquare>("SLC", 33));
 
     // square 34: C2 (Sci2)
     makeAcad("C2", 34, 320, 200, {28, 150, 450, 1000, 1200, 1400}, sci2);
