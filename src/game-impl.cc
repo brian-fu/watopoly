@@ -1017,8 +1017,12 @@ bool TradeCommand::execute(WatopolyGame &game, const std::vector<std::string> &a
     std::cout << ". Accept? (accept/reject): ";
 
     std::string response;
-    std::cin >> response;
-    std::cin.ignore(10000, '\n');
+    while (true) {
+        std::cin >> response;
+        std::cin.ignore(10000, '\n');
+        if (response == "accept" || response == "reject") break;
+        std::cout << "Invalid input. Please type 'accept' or 'reject': ";
+    }
 
     if (response != "accept") {
         std::cout << "Trade rejected." << std::endl;
@@ -1291,6 +1295,10 @@ bool SaveCommand::execute(WatopolyGame &game, const std::vector<std::string> &ar
 
 // HistoryCommand (enhancement)
 bool HistoryCommand::execute(WatopolyGame &game, const std::vector<std::string> &args) {
+    if (!game.eventLogger().isEnabled()) {
+        std::cout << "History logging is disabled. Start the game with -enablelog to enable it." << std::endl;
+        return false;
+    }
     int n = -1;
     if (!args.empty()) {
         tryParseInt(args[0], n);
@@ -1310,7 +1318,12 @@ bool ReplayCommand::execute(WatopolyGame &game, const std::vector<std::string> &
         return true;
     }
 
-    game.replayEventsFromFile(args[0]);
+    const std::string &filename = args[0];
+    if (filename.size() < 7 || filename.substr(filename.size() - 7) != ".replay") {
+        std::cout << "Replay file must have a .replay extension." << std::endl;
+        return false;
+    }
+    game.replayEventsFromFile(filename);
     return true;
 }
 
