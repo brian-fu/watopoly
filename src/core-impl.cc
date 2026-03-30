@@ -160,10 +160,6 @@ bool AcademicBuilding::canBuyImprovement() const {
     if (numImprovements_ >= 5) return false;
     if (!block_->isOwnedBy(*getOwner())) return false;
     if (getOwner()->getCash() < improvementCost_) return false;
-    // even improvement rule: can only improve if at the minimum level in the block
-    for (auto *b : block_->buildings()) {
-        if (b->improvements() < numImprovements_) return false;
-    }
     return true;
 }
 
@@ -176,10 +172,6 @@ bool AcademicBuilding::buyImprovement() {
 
 bool AcademicBuilding::sellImprovement() {
     if (numImprovements_ <= 0) return false;
-    // even sell rule: can only sell from the most-improved in the block
-    for (auto *b : block_->buildings()) {
-        if (b->improvements() > numImprovements_) return false;
-    }
     --numImprovements_;
     getOwner()->addCash(improvementCost_ / 2);
     return true;
