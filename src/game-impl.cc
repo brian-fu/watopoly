@@ -186,6 +186,9 @@ void WatopolyGame::processTurn() {
         if (player.isInTimsLine()) {
             // still stuck, go to next player
             turn_.phase = TurnPhase::PostRoll;
+        } else {
+            // player left tims and moved — redraw before entering command loop
+            redraw();
         }
     }
 
@@ -236,8 +239,10 @@ void WatopolyGame::handleTimsLine(Player &player) {
         return dice_.roll();
     };
 
-    // first two turns: player may roll, pay, or use a cup
-    if (player.timsTurns() < 2) {
+    bool isThirdTurn = (player.timsTurns() >= 2);
+    if (isThirdTurn) std::cout << "Final turn in DC Tims Line. You must leave this turn." << std::endl;
+
+    while (true) {
         std::cout << "Options: roll (try doubles), pay ($50), cup (use Roll Up the Rim)" << std::endl;
         std::string line;
         std::cout << "> ";
@@ -254,10 +259,40 @@ void WatopolyGame::handleTimsLine(Player &player) {
                 std::cout << "Doubles! " << player.getName() << " leaves DC Tims Line." << std::endl;
                 logger_.log(player.getName() + " left Tims by rolling doubles");
                 moveAfterLeaving(r.sum);
-            } else {
+                return;
+            }
+            if (!isThirdTurn) {
                 player.incrementTimsTurns();
                 std::cout << "No doubles. Still in DC Tims Line." << std::endl;
+                return;
             }
+            // third turn: no doubles means forced pay or cup
+            std::cout << "No doubles. You must pay $50 or use a Roll Up the Rim cup." << std::endl;
+            bool hasCup = player.timsCups() > 0;
+            std::string forcedChoice = (hasCup ? "cup/pay" : "pay");
+            std::cout << "Choose " << forcedChoice << ": ";
+            std::string forced;
+            while (true) {
+                std::cin >> forced;
+                std::cin.ignore(10000, '\n');
+                if (forced == "pay") break;
+                if (forced == "cup" && hasCup) break;
+                if (forced == "cup" && !hasCup)
+                    std::cout << "You don't have any Roll Up the Rim cups. Enter 'pay': ";
+                else
+                    std::cout << "Invalid input. Choose " << forcedChoice << ": ";
+            }
+            if (forced == "cup") {
+                player.useTimsCup();
+                std::cout << player.getName() << " used a Roll Up the Rim cup." << std::endl;
+                logger_.log(player.getName() + " left Tims using a cup");
+            } else {
+                handleDebt(player, 50, nullptr);
+                if (player.isBankrupt()) return;
+                std::cout << player.getName() << " paid $50 to leave DC Tims Line." << std::endl;
+                logger_.log(player.getName() + " left Tims by paying $50");
+            }
+            moveAfterLeaving(r.sum);
             return;
         }
 
@@ -281,70 +316,14 @@ void WatopolyGame::handleTimsLine(Player &player) {
                 player.setLastRoll(r);
                 std::cout << "Rolled: " << r.die1 << " + " << r.die2 << " = " << r.sum << std::endl;
                 moveAfterLeaving(r.sum);
-            } else {
-                std::cout << "You don't have any Roll Up the Rim cups." << std::endl;
+                return;
             }
-            return;
+            std::cout << "You don't have any Roll Up the Rim cups." << std::endl;
+            continue;
         }
 
-        std::cout << "Invalid option. Still in DC Tims Line." << std::endl;
-        return;
+        std::cout << "Invalid option. Please enter 'roll', 'pay', or 'cup'." << std::endl;
     }
-
-    // third turn: must roll first; if no doubles then must pay or use cup
-    std::cout << "Third turn in line. Rolling for doubles..." << std::endl;
-    DiceResult r;
-    if (testingMode_) {
-        // in testing mode, read a line to optionally get dice values
-        std::string line;
-        std::cout << "> ";
-        if (!std::getline(std::cin, line)) return;
-        std::istringstream iss{line};
-        std::string cmd;
-        iss >> cmd;
-        // expect "roll <d1> <d2>" or just auto-roll
-        r = doTimsRoll(iss);
-    } else {
-        r = dice_.roll();
-    }
-    player.setLastRoll(r);
-    std::cout << "Rolled: " << r.die1 << " + " << r.die2 << " = " << r.sum << std::endl;
-    if (r.isDoubles) {
-        std::cout << "Doubles! " << player.getName() << " leaves DC Tims Line." << std::endl;
-        logger_.log(player.getName() + " left Tims by rolling doubles (3rd turn)");
-        moveAfterLeaving(r.sum);
-        return;
-    }
-
-    std::cout << "No doubles. You must pay $50 or use a Roll Up the Rim cup." << std::endl;
-    bool hasCup = player.timsCups() > 0;
-    std::string forcedChoice = (hasCup ? "cup/pay" : "pay");
-    std::cout << "Choose " << forcedChoice << ": ";
-    std::string choice;
-    while (true) {
-        std::cin >> choice;
-        std::cin.ignore(10000, '\n');
-        if (choice == "pay") break;
-        if (choice == "cup" && hasCup) break;
-        if (choice == "cup" && !hasCup)
-            std::cout << "You don't have any Roll Up the Rim cups. Enter 'pay': ";
-        else
-            std::cout << "Invalid input. Choose " << forcedChoice << ": ";
-    }
-
-    if (choice == "cup") {
-        player.useTimsCup();
-        std::cout << player.getName() << " used a Roll Up the Rim cup." << std::endl;
-        logger_.log(player.getName() + " left Tims using a cup (3rd turn)");
-        moveAfterLeaving(r.sum);
-        return;
-    }
-
-    handleDebt(player, 50, nullptr);
-    if (player.isBankrupt()) return;
-    std::cout << player.getName() << " paid $50 to leave DC Tims Line." << std::endl;
-    logger_.log(player.getName() + " left Tims by paying $50 (3rd turn)");
-    moveAfterLeaving(r.sum);
 }
 
 GameSnapshot WatopolyGame::snapshot() const {
