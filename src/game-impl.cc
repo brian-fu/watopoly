@@ -584,25 +584,39 @@ Player *WatopolyGame::findPlayer(const std::string &name) {
 void WatopolyGame::runAuction(Property &property) {
     auto bidders = getActivePlayers();
     int currentBid = 0;
-    Player *leader = nullptr;
+    int leaderIdx = -1;
+    std::vector<int> bids(bidders.size(), 0);
     std::vector<bool> withdrawn(bidders.size(), false);
+
+    auto countActive = [&]() {
+        int active = 0;
+        for (int i = 0; i < static_cast<int>(bidders.size()); ++i) {
+            if (!withdrawn[i]) ++active;
+        }
+        return active;
+    };
+
+    auto recomputeLeader = [&]() {
+        leaderIdx = -1;
+        currentBid = 0;
+        for (int i = 0; i < static_cast<int>(bidders.size()); ++i) {
+            if (!withdrawn[i] && bids[i] > currentBid) {
+                currentBid = bids[i];
+                leaderIdx = i;
+            }
+        }
+    };
 
     std::cout << "Auction for " << property.name() << "!" << std::endl;
 
     while (true) {
-        int activeCount = 0;
-        for (int i = 0; i < static_cast<int>(bidders.size()); ++i) {
-            if (!withdrawn[i]) ++activeCount;
-        }
+        int activeCount = countActive();
         if (activeCount <= 1) break;
 
         for (int i = 0; i < static_cast<int>(bidders.size()); ++i) {
             if (withdrawn[i]) continue;
             // recount since someone might have withdrawn
-            activeCount = 0;
-            for (int j = 0; j < static_cast<int>(bidders.size()); ++j) {
-                if (!withdrawn[j]) ++activeCount;
-            }
+            activeCount = countActive();
             if (activeCount <= 1) break;
 
             std::cout << bidders[i]->getName() << ", current bid: $" << currentBid
@@ -625,12 +639,14 @@ void WatopolyGame::runAuction(Property &property) {
 
             if (input == "withdraw") {
                 withdrawn[i] = true;
+                if (leaderIdx == i) recomputeLeader();
             } else {
                 int bid = 0;
                 if (tryParseInt(input, bid)) {
                     if (bid > currentBid && bid <= bidders[i]->getCash()) {
+                        bids[i] = bid;
                         currentBid = bid;
-                        leader = bidders[i];
+                        leaderIdx = i;
                     } else {
                         std::cout << "Invalid bid. Must be > $" << currentBid
                                   << " and within your cash." << std::endl;
@@ -644,20 +660,28 @@ void WatopolyGame::runAuction(Property &property) {
         }
     }
 
-    // if nobody explicitly bid, the last remaining player still wins at $0
-    Player *winner = leader;
-    if (!winner) {
+    // winner must be non-withdrawn; if no bids, last remaining player wins at $0
+    int winnerIdx = -1;
+    if (leaderIdx >= 0 && !withdrawn[leaderIdx]) {
+        winnerIdx = leaderIdx;
+    } else {
         for (int i = 0; i < static_cast<int>(bidders.size()); ++i) {
-            if (!withdrawn[i]) { winner = bidders[i]; break; }
+            if (!withdrawn[i]) { winnerIdx = i; break; }
         }
     }
 
-    if (winner) {
-        if (currentBid > 0) winner->deductCash(currentBid);
+    if (winnerIdx >= 0) {
+        Player *winner = bidders[winnerIdx];
+        int winningBid = bids[winnerIdx];
+        if (winningBid > 0 && !winner->deductCash(winningBid)) {
+            std::cout << "Auction failed: " << winner->getName()
+                      << " can no longer afford the winning bid." << std::endl;
+            return;
+        }
         property.setOwner(winner);
         winner->addProperty(&property);
         std::cout << winner->getName() << " won the auction for " << property.name()
-                  << " at $" << currentBid << "." << std::endl;
+                  << " at $" << winningBid << "." << std::endl;
         logger_.log(winner->getName() + " won auction for " + property.name());
     } else {
         std::cout << "No one bid. " << property.name() << " remains unowned." << std::endl;
